@@ -1,0 +1,1756 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1510"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Brasileirão TCG">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icone-192.png"><link rel="apple-touch-icon" href="icone-180.png">
+<title>Brasileirão TCG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: uma "tela de celular" em pé, centralizada no PC (no celular de verdade ocupa a tela toda). De cima pra baixo: placar, rival (linha de trás, linha da frente), faixa de narração, você (frente, trás), sua mão e barra de ações. Tocar numa carta abre uma gaveta com a carta grande e o que dá pra fazer com ela. */
+:root{
+  color-scheme:dark;
+  --bg:#0B1510; --phone:#10201A; --pitch:#174029; --pitch2:#1B4A30; --line:rgba(255,255,255,.16);
+  --panel:#13231B; --panel2:#1B3027; --fg:#EEF4EE; --muted:#9DB3A6; --gold:#FFD84D; --pink:#FF7FA8;
+  --mine:#4CC27A; --theirs:#FF6B6B; --ink:#3B2A5C;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-card:"Baloo 2",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.35;margin:0}
+button{font:inherit;cursor:pointer;color:inherit}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.stage{min-height:100%;display:flex;justify-content:center;align-items:center;padding-inline:16px;padding-block:16px}
+.phone{position:relative;width:min(100%,400px);height:min(860px,calc(100dvh - 32px));min-height:640px;background:var(--phone);border:10px solid #050A07;border-radius:36px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+@media (max-width:460px){.stage{padding:0}.phone{width:100%;height:100dvh;min-height:0;border:0;border-radius:0}}
+.tag{position:fixed;left:16px;bottom:12px;color:var(--muted);font-size:12px;max-width:260px}
+@media (max-width:900px){.tag{display:none}}
+
+/* placar */
+.top{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;background:#0A1611;border-bottom:1px solid var(--line)}
+.top .sc{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-weight:700;text-transform:uppercase;font-size:15px;flex:1;min-width:0}
+.top .sc i{width:12px;height:12px;border-radius:50%;flex:none;border:1.5px solid rgba(255,255,255,.6)}
+.top .sc .n{background:#000;border-radius:6px;padding:0 8px;font-size:20px;font-variant-numeric:tabular-nums}
+.top .sc span.t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .ck{font-family:var(--f-display);font-weight:700;color:var(--gold);font-size:16px;font-variant-numeric:tabular-nums}
+.ib{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);display:grid;place-items:center;font-size:15px;flex:none}
+
+/* campo */
+.field{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:4px;padding:6px 8px;background:repeating-linear-gradient(180deg,var(--pitch) 0 44px,var(--pitch2) 44px 88px)}
+.side{display:flex;flex-direction:column;gap:4px}
+.lineLbl{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:10px;color:rgba(255,255,255,.65);padding:0 2px}
+.lineLbl b.ai{color:var(--theirs)}.lineLbl b.me{color:var(--mine)}
+.ln{display:flex;justify-content:center;gap:6px}
+.ln.back .fc{width:84px;height:92px}
+.ln.back .fc .art{height:44px}
+.ticker{background:rgba(0,0,0,.45);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--fg);display:flex;gap:8px;align-items:center;min-height:42px}
+.ticker .gl{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.ticker .gl.open{background:var(--theirs);color:#2A0606}.ticker .gl.closed{background:rgba(255,255,255,.12);color:var(--muted)}
+.ticker .lt{flex:1;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* carta de campo compacta */
+.fc{width:112px;height:128px;border-radius:10px;padding:3px;position:relative;flex:none;background:linear-gradient(135deg,#FFB3D9 0%,#C9B6FF 35%,#A8F0FF 65%,#FFF1A8 100%);border:2px solid var(--ink);color:#2A1F45;font-family:var(--f-card);text-align:left;display:block}
+.fc .in{background:#FFF;border-radius:7px;height:100%;display:flex;flex-direction:column;overflow:hidden;border:1.5px solid var(--ink)}
+.fc .hd{display:flex;justify-content:space-between;align-items:center;padding:1px 4px 0;gap:2px}
+.fc .nm{font-weight:800;font-size:11px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc .fo{font-weight:800;font-size:12px;color:#E23B7A;font-variant-numeric:tabular-nums;flex:none}
+.fc .art{flex:none;height:64px;margin:1px 4px 0;border-radius:4px;border:1.5px solid var(--ink);overflow:hidden;background:radial-gradient(circle at 50% 120%,#8FD694 0 42%,transparent 43%),linear-gradient(180deg,#FFE3F1 0%,#D9E8FF 100%)}
+.fc .art svg{width:100%;height:100%;display:block}
+.fc .ft{display:flex;align-items:center;gap:2px;padding:2px 4px;flex-wrap:wrap;min-height:18px}
+.fc .ro{font-size:11px}
+.fc .bar{height:4px;margin:2px 4px 0;background:#F1D6E2;border-radius:2px;overflow:hidden}.fc .bar i{display:block;height:100%;background:#E23B7A}
+.fc.sel{box-shadow:0 0 0 3px var(--pink),0 0 16px rgba(255,127,168,.6)}
+.fc.ready{box-shadow:0 0 0 2px var(--gold)}
+.slot{width:112px;height:128px;border:2px dashed rgba(255,255,255,.25);border-radius:10px;display:grid;place-items:center;color:rgba(255,255,255,.45);font-size:11px;text-align:center;padding:4px;flex:none;background:transparent}
+.ln.back .slot{width:84px;height:92px}
+.e{display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;font:800 8px/1 var(--f-body);color:#fff;border:1px solid rgba(0,0,0,.35);flex:none}
+.e.G{background:#D9481C}.e.T{background:#2563C9}.e.V{background:#E2A500;color:#231A00}.e.C{background:#8B8B9A}
+.bf{font-size:9px;font-weight:800;background:#FFD84D;color:#3A2600;border-radius:4px;padding:0 3px}
+
+/* mão */
+.handBar{background:#0A1611;border-top:1px solid var(--line);padding:6px 8px 4px}
+.handBar .hl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:0 2px 4px}
+.handBar .hl b{color:var(--gold);font-weight:700}
+.hand{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity}
+.hc{width:72px;height:96px;flex:none;border-radius:8px;border:2px solid var(--ink);padding:3px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;text-align:center;font-family:var(--f-card);color:#2A1F45;scroll-snap-align:start;background:#FFF}
+.hc .k{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6B5E8C}
+.hc .nm{font-weight:800;font-size:10px;line-height:1.05;max-height:22px;overflow:hidden}
+.hc .mini{width:100%;height:44px;border-radius:4px;overflow:hidden;background:linear-gradient(180deg,#FFE3F1,#D9E8FF)}
+.hc .mini svg{width:100%;height:100%}
+.hc .ic{font-size:26px;line-height:1.2}
+.hc.player{background:linear-gradient(135deg,#FFB3D9,#C9B6FF 40%,#A8F0FF 70%,#FFF1A8)}
+.hc.event{background:linear-gradient(135deg,#FFE680,#FFB36B)}.hc.stadium{background:linear-gradient(135deg,#7FD1FF,#5B8CFF)}.hc.reaction{background:linear-gradient(135deg,#FF9AA8,#C86BFF)}
+.hc.energy .big{width:34px;height:34px;font-size:15px;margin-top:6px}
+.hc.dim{opacity:.55}
+.actions{display:flex;gap:6px;padding:6px 8px 10px;background:#0A1611}
+.actions button{flex:1;border:0;border-radius:12px;padding:11px 8px;font-weight:800;font-size:14px}
+.actions .end{background:var(--gold);color:#231A00}
+.actions .end:disabled{opacity:.4;cursor:not-allowed}
+.actions .sec{background:var(--panel2);color:var(--fg);border:1px solid var(--line);flex:0 0 auto;padding-inline:14px}
+.turnPill{position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:4;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;border-radius:999px;padding:3px 10px;pointer-events:none}
+.turnPill.me{background:var(--mine);color:#06140C}.turnPill.ai{background:var(--theirs);color:#2A0606}.turnPill.setup{background:var(--gold);color:#231A00}
+
+/* gaveta */
+.sheetWrap{position:absolute;inset:0;background:rgba(3,8,5,.6);display:flex;align-items:flex-end;z-index:10}
+.sheet{width:100%;max-height:88%;overflow-y:auto;background:var(--panel);border-top:1px solid var(--line);border-radius:20px 20px 0 0;padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px}
+.sheet .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
+.sheet h3{margin:0;font-family:var(--f-display);font-weight:700;font-size:20px;text-transform:uppercase;text-wrap:balance}
+.sheet p{margin:0;color:var(--muted)}
+.sheet .row{display:flex;gap:10px;align-items:flex-start}
+.btns{display:flex;flex-direction:column;gap:6px}
+.ab{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--fg)}
+.ab b{display:block}.ab small{display:block;color:var(--muted);font-size:12px}
+.ab strong{font-family:var(--f-display);font-size:20px}
+.ab.pri{background:var(--gold);color:#231A00;border-color:var(--gold)}.ab.pri small{color:#5A4500}
+.ab:disabled{opacity:.45;cursor:not-allowed}
+.ab .e{width:18px;height:18px;font-size:10px}
+.close{align-self:stretch;background:transparent;border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--muted);font-weight:700}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.log li{border-left:3px solid var(--line);padding-left:8px;color:var(--muted)}
+.log li.me{border-color:var(--mine);color:var(--fg)}.log li.ai{border-color:var(--theirs);color:var(--fg)}.log li.big{color:var(--gold);font-weight:700}
+
+/* carta grande (gaveta) */
+.cm{width:150px;height:208px;border-radius:12px;padding:5px;flex:none;color:#2A1F45;font-family:var(--f-card);background:linear-gradient(135deg,#FFB3D9 0%,#C9B6FF 35%,#A8F0FF 65%,#FFF1A8 100%);border:2px solid var(--ink);text-align:left}
+.cm .in{background:#FFF;border-radius:8px;height:100%;display:flex;flex-direction:column;overflow:hidden;border:1.5px solid var(--ink)}
+.cm .hd{display:flex;justify-content:space-between;align-items:center;padding:2px 5px 0;gap:4px}
+.cm .st{font-weight:800;font-size:8px;background:var(--ink);color:#FFD6EE;border-radius:4px;padding:0 4px;white-space:nowrap}
+.cm .st.Cria{background:#2F8F4E;color:#E4FFE9}.cm .st.Ídolo{background:#B8860B;color:#FFF6D6}
+.cm .fo{font-weight:800;font-size:12px;color:#E23B7A}
+.cm .nm{font-weight:800;font-size:13px;line-height:1.05;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cm .art{margin:2px 5px 0;height:66px;border-radius:5px;border:1.5px solid var(--ink);overflow:hidden;background:radial-gradient(circle at 50% 120%,#8FD694 0 42%,transparent 43%),linear-gradient(180deg,#FFE3F1 0%,#D9E8FF 100%)}
+.cm .art svg{width:100%;height:100%;display:block}
+.cm .ps{display:flex;justify-content:space-between;font-size:9px;font-weight:700;padding:1px 5px;margin:2px 5px 0;border-radius:4px}
+.cm .ps.role-T{background:#DDEBFF}.cm .ps.role-S{background:#F3E8FF}.cm .ps.role-C{background:#FFE4E4}
+.cm .mv{padding:2px 5px;display:flex;flex-direction:column;gap:1px;flex:1;min-height:0}
+.cm .mv div{display:grid;grid-template-columns:auto 1fr auto;gap:3px;align-items:center;font-size:9.5px;font-weight:700;line-height:1.1}
+.cm .mv strong{font-size:12px}.cm .mv em{font-style:normal;color:#B23A48}
+.cm .en{display:flex;gap:2px;padding:0 5px 3px;min-height:15px;flex-wrap:wrap}
+.cm.energy .in{align-items:center;justify-content:center;gap:6px;text-align:center}
+.cm.energy .big{width:70px;height:70px;font-size:30px;border-width:3px}
+.cm.event{background:linear-gradient(135deg,#FFE680,#FFB36B)}.cm.stadium{background:linear-gradient(135deg,#7FD1FF,#5B8CFF)}.cm.reaction{background:linear-gradient(135deg,#FF9AA8,#C86BFF)}
+.cm .tp{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 6px 0;color:#6B5E8C}
+.cm .ic{font-size:40px;text-align:center;line-height:1.3}
+.cm .tx{font-size:10.5px;font-weight:600;padding:2px 7px;line-height:1.2;color:#3A2F55}
+
+/* janelas */
+.ov{position:absolute;inset:0;background:rgba(4,10,7,.82);display:grid;place-items:center;padding:16px;z-index:20}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;width:100%;max-height:100%;overflow-y:auto}
+.dlg h2{margin:0 0 8px;font-family:var(--f-display);font-weight:700;font-size:26px;text-transform:uppercase;text-wrap:balance}
+.dlg p,.dlg li{color:var(--muted)}
+.dlg ol{padding-left:18px;margin:0}.dlg li{margin-bottom:4px}
+.dlg .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800}
+.btn.p{background:var(--gold);color:#231A00}.btn.s{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}
+.pick{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.pick button{border-radius:14px;padding:14px;border:2px solid var(--line);background:var(--panel2);text-align:left}
+.pick b{font-family:var(--f-display);font-size:22px;text-transform:uppercase;display:block}
+.pick small{color:var(--muted)}
+.toast{position:absolute;left:50%;top:38%;transform:translateX(-50%);z-index:30;font-family:var(--f-display);font-weight:700;text-transform:uppercase;font-size:56px;color:var(--gold);text-shadow:0 4px 0 #000,0 0 30px rgba(255,216,77,.5);pointer-events:none;white-space:nowrap}
+.coin{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);z-index:30;width:104px;height:104px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#FFF3B0,#E2A500 60%,#9A6B00);border:5px solid #6B4A00;font-family:var(--f-display);font-weight:700;font-size:20px;color:#3A2600;text-transform:uppercase;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion:no-preference){
+  .coin.spin{animation:spin .6s ease-out}
+  @keyframes spin{from{transform:translate(-50%,-50%) rotateY(0)}to{transform:translate(-50%,-50%) rotateY(1080deg)}}
+  .toast{animation:pop .9s ease-out}
+  @keyframes pop{0%{transform:translateX(-50%) scale(.4);opacity:0}30%{transform:translateX(-50%) scale(1.1);opacity:1}100%{transform:translateX(-50%) scale(1)}}
+  .sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+}
+
+.clubs{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}
+.cl{display:flex;gap:4px}
+.cl .go{flex:1;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;text-align:left;border-radius:12px;padding:8px 10px;border:1px solid var(--line);background:var(--panel2)}
+.cl .go i{grid-row:span 2;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--c1) 50%,var(--c2) 50%);border:1.5px solid rgba(255,255,255,.6)}
+.cl .go b{font-family:var(--f-display);font-size:17px;text-transform:uppercase}
+.cl .go small{color:var(--muted);font-size:12px}
+.cl .inf{width:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:16px}
+/* molduras por estágio (mesmas cores da galeria de arte) */
+.f-titular{background:linear-gradient(180deg,#FFE680 0%,#FFD23F 100%)}
+.f-cria{background:linear-gradient(180deg,#B9F0A8 0%,#5DBB63 100%)}
+.f-idolo{background:linear-gradient(135deg,#FFB3D9 0%,#C9B6FF 35%,#A8F0FF 65%,#FFF1A8 100%)}
+.hc.player.f-titular,.hc.player.f-cria,.hc.player.f-idolo{border-color:var(--ink)}
+.fc{height:132px;width:106px}.fc .art{height:70px}
+.ln.back .fc{height:90px;width:80px}.ln.back .fc .art{height:42px}
+.slot{height:132px;width:106px}.ln.back .slot{height:90px;width:80px}
+.field{overflow-y:auto}
+.cm .art{height:80px}
+</style>
+
+</head><body>
+<div id="app"></div>
+
+<script>
+/* Arte cartoon do Card Game do Brasileirão (aprovada por Leonardo em 2026-10-13).
+   Fonte da verdade: card-game/arte/galeria-do-elenco.html (thread "Arte das cartas"). Gerado a partir dela.
+   Uso: ArteCartoon.portrait(def) devolve um <svg> (busto do jogador, 200x160) para colocar na área de arte da carta.
+        def precisa de {key, club, name, num, pos:"D"|"M"|"A", stage:"Cria"|"Titular"|"Ídolo"}. A aparência vem de ArteCartoon.looks[def.key].
+        ArteCartoon.frame(stage) devolve a classe de moldura sugerida: "cria" | "titular" | "idolo".
+   Tudo fica dentro desta função para não colidir com nomes do jogo (CLUBS, HAIR, P...). */
+(function(){
+/* pat: none liso, h listras deitadas, v listras em pé, v3 listras de 3 cores, hb duas faixas deitadas, band faixa no peito, sash faixa diagonal
+   acc: cor de destaque (número da carta e fundo do desenho) */
+const K=(id,code,name,pat,c1,c2,c3,collar,acc,crest,crestBg,crestInk)=>({id,code,name,pat,c1,c2,c3,collar,acc:acc||c1,crest,crestBg,crestInk});
+const CLUBS=Object.fromEntries([
+  K("cap","CAP","Athletico-PR","diag","#111111","#C8102E",null,"#111111","#C8102E","CAP","#C8102E","#FFFFFF"),
+  K("cam","CAM","Atlético-MG","v","#111111","#FFFFFF",null,"#111111",null,"CAM"),
+  K("bah","BAH","Bahia","sash","#FFFFFF","#0057A8","#D2232A","#0057A8","#0057A8","ECB","#0057A8","#FFFFFF"),
+  K("bot","BOT","Botafogo","v","#111111","#FFFFFF",null,"#111111",null,"BFR"),
+  K("rbb","RBB","Bragantino","slash","#FFFFFF","#D0021B",null,"#D0021B","#D0021B","RBB","#D0021B","#FFFFFF"),
+  K("cha","CHA","Chapecoense","v","#00843D","#FFFFFF",null,"#00843D",null,"ACF"),
+  K("cor","COR","Corinthians","none","#FFFFFF","#111111",null,"#111111","#111111","SCCP","#111111","#FFFFFF"),
+  K("ctb","CTB","Coritiba","hb","#F3EEDF","#00543C",null,"#00543C","#00543C","CFC","#00543C","#FFFFFF"),
+  K("cru","CRU","Cruzeiro","none","#0033A0","#FFFFFF",null,"#FFFFFF",null,"CEC"),
+  K("fla","FLA","Flamengo","h","#C8102E","#111111",null,"#111111",null,"CRF"),
+  K("flu","FLU","Fluminense","v3","#870A28","#00613C","#FFFFFF","#FFFFFF",null,"FFC","#870A28","#FFFFFF"),
+  K("gre","GRE","Grêmio","v3","#0D80BF","#111111","#FFFFFF","#111111",null,"GFPA","#0D80BF","#FFFFFF"),
+  K("int","INT","Internacional","none","#E30613","#FFFFFF",null,"#FFFFFF",null,"SCI"),
+  K("mir","MIR","Mirassol","pin","#FFD100","#0B5A2E","#E3AE00","#0B5A2E","#0B5A2E","MFC","#0B5A2E","#FFD100"),
+  K("pal","PAL","Palmeiras","none","#006437","#FFFFFF",null,"#FFFFFF",null,"SEP"),
+  K("rem","REM","Remo","none","#0A1F5C","#FFFFFF",null,"#FFFFFF",null,"CR","#FFFFFF","#0A1F5C"),
+  K("san","SAN","Santos","none","#FFFFFF","#111111",null,"#111111","#111111","SFC","#111111","#FFFFFF"),
+  K("sao","SAO","São Paulo","band","#FFFFFF","#E30613","#111111","#111111","#E30613","SPFC","#E30613","#FFFFFF"),
+  K("vas","VAS","Vasco","sash","#111111","#FFFFFF",null,"#FFFFFF",null,"CRVG"),
+  K("vit","VIT","Vitória","v","#D2232A","#111111",null,"#111111",null,"ECV")
+].map(c=>[c.id,c]));
+function kitPattern(c,id){
+  const T=s=>`<pattern id="${id}" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">${s}</pattern>`;
+  const base=`<rect width="200" height="200" fill="${c.c1}"/>`;
+  if(c.pat==="h") return `<pattern id="${id}" width="20" height="14" patternUnits="userSpaceOnUse"><rect width="20" height="14" fill="${c.c1}"/><rect y="7" width="20" height="7" fill="${c.c2}"/></pattern>`;
+  if(c.pat==="v") return `<pattern id="${id}" x="1" width="22" height="20" patternUnits="userSpaceOnUse"><rect width="22" height="20" fill="${c.c1}"/><rect x="11" width="11" height="20" fill="${c.c2}"/></pattern>`;
+  if(c.pat==="v3") return `<pattern id="${id}" x="2" width="24" height="20" patternUnits="userSpaceOnUse"><rect width="24" height="20" fill="${c.c1}"/><rect x="10" width="10" height="20" fill="${c.c2}"/><rect x="20" width="4" height="20" fill="${c.c3}"/></pattern>`;
+  if(c.pat==="diag") return `<pattern id="${id}" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><rect width="26" height="26" fill="${c.c1}"/><rect width="10" height="26" fill="${c.c2}"/></pattern>`;
+  if(c.pat==="slash") return T(base+`<path d="M20 172 L46 128 L54 130 L30 172 Z M150 130 L158 128 L184 172 L174 172 Z M36 160 l6 -6 6 6 -6 6 z M158 160 l6 -6 6 6 -6 6 z" fill="${c.c2}"/>`);
+  if(c.pat==="pin") return `<pattern id="${id}" width="9" height="20" patternUnits="userSpaceOnUse"><rect width="9" height="20" fill="${c.c1}"/><rect x="8" width="1.2" height="20" fill="${c.c3}"/></pattern>`;
+  if(c.pat==="hb") return T(base+`<rect y="138" width="200" height="22" fill="${c.c2}"/><rect y="148" width="200" height="2.2" fill="#FFFFFF"/>`);
+  if(c.pat==="band") return T(base+`<rect y="139" width="200" height="4.5" fill="${c.c2}"/><rect y="143.5" width="200" height="4.5" fill="${c.c3}"/>`);
+  if(c.pat==="sash") return T(base+(c.c3?`<polygon points="30,118 44,118 166,180 152,180" fill="${c.c2}"/><polygon points="44,118 58,118 180,180 166,180" fill="${c.c3}"/>`:`<polygon points="34,118 54,118 176,180 156,180" fill="${c.c2}"/>`));
+  return T(base);
+}
+const ROLE={D:{k:"T",name:"Tanque",pos:"Defensor"},M:{k:"S",name:"Suporte",pos:"Meia"},A:{k:"C",name:"Carry",pos:"Atacante"}};
+/* pele: [cor, sombra] */
+const SKIN={a:["#F3CDB0","#D9A88A"],b:["#E5B48E","#C48E68"],c:["#D19C74","#AE7651"],d:["#A86F4A","#865234"],e:["#7A4A2E","#5E3520"],f:["#5A3520","#422415"]};
+const HAIRC={k:"#141014",d:"#2A1A10",b:"#5A3A20",r:"#8A4A26",l:"#B88A4A",p:"#EBDDA6",g:"#B9BEC8"};
+const TXT={
+  skin:{a:"bem clara",b:"clara",c:"morena clara",d:"morena",e:"negra",f:"negra retinta"},
+  hairc:{k:"preto",d:"castanho escuro",b:"castanho",r:"ruivo escuro",l:"loiro escuro",p:"loiro platinado",g:"pintado de prateado"},
+  style:{buzz:"raspado baixinho",short:"curto",spiky:"espetado",curly:"cacheado",long:"comprido até o ombro",bun:"preso em coque",slick:"penteado pra trás",bald:"careca",twists:"twists (trancinhas curtas)",fringe:"franja caindo na testa",
+    curltop:"cachinhos curtos em cima, lados raspados",wavy:"ondulado com volume em cima",fade:"curto penteado pra frente, lados degradê",afro:"black power cacheado com bastante volume",swept:"grosso, jogado pra trás e pra cima",messy:"cacheado bagunçado caindo na testa",sidefringe:"liso com franja de lado",textured:"curto bagunçado com franja pra cima",undercut:"lados raspados, topete espetado e rabinho atrás",frosted:"espetado pra cima com as pontas platinadas, lados degradê",cornrows:"tranças nagô puxadas pra trás",dreadsback:"curto em cima, com dreads loiros finos atrás",mop:"volumoso e ondulado caindo dos lados",curtains:"liso até a orelha, repartido no meio"},
+  beard:{stubble:"barba rala",full:"barba cheia",must:"bigode",mustThin:"bigode fininho",mustThick:"bigodão das antigas",mustRetro:"bigode fino estilo retrô",goatee:"cavanhaque",chin:"barba só no queixo, bem desenhada"},
+  face:{oval:"oval",round:"redondo",square:"queixo quadrado",long:"comprido"},
+  mouth:{grin:"sorrisão mostrando os dentes",smile:"sorriso de boca fechada",serious:"cara séria, concentrado",smirk:"sorriso de canto, confiante",neutral:"cara tranquila"},
+  x:{cap:"braçadeira de capitão",part:"risquinho raspado no cabelo",earL:"brinco na orelha esquerda",earB:"brincos nas duas orelhas",tat777:"tatuagens no pescoço (777 na garganta)",tatThroat:"tatuagem grande na garganta (lampião)",tatSmall:"tatuagem pequena no pescoço",tatNeck:"pescoço cheio de tatuagens",eyesLight:"olhos claros",sleepy:"olhar meio fechado",hoopL:"argolinha na orelha esquerda",hoopB:"argolas nas duas orelhas",chain:"correntinha no pescoço",freckles:"sardas no rosto",crossL:"brinco de cruz pendurado na orelha esquerda",headband:"faixa branca na cabeça com o 10 dourado",browSlit:"risquinho raspado na sobrancelha"}
+};
+
+/* ================== JOGADORES ==================
+   s pele, h cor do cabelo (h2 cor dos lados), st corte, b barba (lista), f rosto, br sobrancelha (1 fina, 2 normal, 3 grossa), m boca, x extras, ref de onde veio a aparência */
+const PLAYERS=[];
+function J(club,key,name,num,pos,stage,lk,from){PLAYERS.push({club,key,name,num,pos,stage,look:Object.assign({b:[],f:"oval",br:2,x:[],ref:"site"},lk),from:from||null});}
+
+J("pal","gomez","Gustavo Gómez",15,"D","Ídolo",{s:"c",h:"d",st:"mop",b:["full","must"],f:"square",br:3,m:"grin",x:["cap"]});
+J("pal","murilo","Murilo",26,"D","Titular",{s:"d",h:"k",st:"curltop",b:["stubble","mustThin","goatee"],f:"long",m:"serious"});
+J("pal","benedetti1","Benedetti",43,"D","Cria",{s:"b",h:"b",st:"wavy",f:"oval",m:"grin"});
+J("pal","benedetti2","Benedetti",43,"D","Titular",{s:"b",h:"b",st:"wavy",f:"oval",m:"grin"},"benedetti1");
+J("pal","arthur1","Arthur",56,"D","Cria",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"smile"});
+J("pal","arthur2","Arthur",56,"D","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"smile"},"arthur1");
+J("pal","marlon","Marlon Freitas",17,"M","Titular",{s:"d",h:"k",st:"buzz",b:["mustThin","goatee"],f:"long",br:1,m:"grin"});
+J("pal","andreas","Andreas Pereira",8,"M","Titular",{s:"b",h:"k",st:"fade",b:["chin"],f:"oval",br:3,m:"grin"});
+J("pal","evangelista","Lucas Evangelista",30,"M","Titular",{s:"c",h:"d",st:"afro",b:["mustThin","goatee"],f:"long",m:"grin"});
+J("pal","mauricio","Maurício",18,"M","Titular",{s:"b",h:"d",st:"messy",b:["stubble","mustRetro"],f:"oval",br:3,m:"grin"});
+J("pal","flaco","Flaco López",42,"A","Titular",{s:"b",h:"k",st:"swept",b:["full","must"],f:"long",br:3,m:"smile"});
+J("pal","arias","Jhon Arias",11,"A","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"grin"});
+J("pal","roque1","Vitor Roque",9,"A","Titular",{s:"c",h:"p",h2:"d",st:"buzz",b:["stubble","must"],f:"oval",m:"grin",ref:"foto"});
+J("pal","roque2","Vitor Roque",9,"A","Ídolo",{s:"c",h:"p",h2:"d",st:"buzz",b:["stubble","must"],f:"oval",m:"grin",ref:"foto"},"roque1");
+J("pal","paulinho","Paulinho",10,"A","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"grin",x:["tat777"]});
+
+J("fla","danilo","Danilo",13,"D","Ídolo",{s:"d",h:"k",st:"curltop",b:["stubble","must"],f:"oval",br:3,m:"serious",x:["cap","part"]});
+J("fla","ortiz","Léo Ortiz",3,"D","Titular",{s:"b",h:"b",st:"swept",b:["mustThick"],f:"long",m:"smirk",x:["sleepy"]});
+J("fla","pereira","Léo Pereira",4,"D","Titular",{s:"b",h:"r",st:"wavy",b:["full","must"],f:"square",m:"serious",x:["eyesLight"]});
+J("fla","pulgar","Erick Pulgar",5,"M","Titular",{s:"c",h:"k",st:"sidefringe",b:["stubble"],f:"oval",br:1,m:"serious",x:["earB","tatThroat"]});
+J("fla","jorginho","Jorginho",21,"M","Ídolo",{s:"b",h:"d",st:"slick",b:["full","must"],f:"square",br:3,m:"serious"});
+J("fla","arrascaeta","Arrascaeta",10,"M","Ídolo",{s:"b",h:"d",st:"textured",b:["stubble","must"],f:"oval",br:3,m:"smirk",x:["earL"]});
+J("fla","delacruz","De la Cruz",18,"M","Titular",{s:"d",h:"k",st:"buzz",b:["stubble","mustThin"],f:"oval",br:1,m:"serious"});
+J("fla","paqueta","Lucas Paquetá",11,"M","Titular",{s:"c",h:"k",st:"slick",b:["full","must"],f:"square",br:3,m:"grin",x:["tatSmall"]});
+J("fla","pedro","Pedro",9,"A","Ídolo",{s:"b",h:"d",st:"short",b:["mustThin","goatee"],f:"long",br:3,m:"smile"});
+J("fla","bh","Bruno Henrique",27,"A","Ídolo",{s:"e",h:"k",st:"undercut",b:["stubble","mustThin"],f:"long",br:3,m:"serious"});
+J("fla","lino","Samuel Lino",16,"A","Titular",{s:"d",h:"k",st:"fade",b:["mustThin","goatee"],f:"round",br:3,m:"smirk"});
+J("fla","carrascal","Carrascal",15,"M","Titular",{s:"c",h:"d",t:"p",st:"frosted",f:"oval",br:1,m:"smirk",x:["hoopL","tatSmall"]});
+J("fla","plata","Gonzalo Plata",19,"A","Titular",{s:"e",h:"k",st:"curltop",b:["stubble"],f:"oval",m:"serious",x:["crossL"]});
+
+/* Athletico-PR · fotos do site oficial (athletico.com.br), 2026-10-13 */
+J("cap","cap-dantas","Dantas",25,"D","Titular",{s:"d",h:"k",st:"fade",f:"square",m:"serious"});
+J("cap","cap-teran","Carlos Terán",22,"D","Titular",{s:"f",h:"k",st:"buzz",b:["stubble"],f:"long",m:"grin"});
+J("cap","cap-leo","Léo",3,"D","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"grin"});
+J("cap","cap-arthurdias","Arthur Dias",4,"D","Titular",{s:"c",h:"k",st:"slick",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("cap","cap-aguirre","Aguirre",33,"D","Titular",{s:"b",h:"d",st:"buzz",b:["stubble"],f:"square",br:3,m:"neutral"});
+J("cap","cap-gilbertomoraes","Gilberto Moraes",12,"D","Titular",{s:"d",h:"k",st:"curltop",b:["must","goatee"],f:"long",br:3,m:"serious"});
+J("cap","cap-gilbertosantos","Gilberto dos Santos",2,"D","Titular",{s:"d",h:"k",st:"short",b:["mustThin","goatee"],f:"round",m:"grin"});
+J("cap","cap-benavidez","Gastón Benavídez",29,"D","Titular",{s:"b",h:"d",st:"swept",b:["stubble"],f:"long",m:"grin"});
+J("cap","cap-claudinho","Claudinho",26,"D","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"serious"});
+J("cap","cap-esquivel","Lucas Esquivel",37,"D","Titular",{s:"b",h:"k",st:"fringe",f:"oval",br:3,m:"neutral"});
+J("cap","cap-leoderik","Léo Derik",6,"D","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin"],f:"oval",br:1,m:"serious",x:["tatSmall"]});
+J("cap","cap-luizgustavo","Luiz Gustavo",14,"M","Titular",{s:"d",h:"k",st:"curltop",b:["stubble"],f:"long",m:"serious"});
+J("cap","cap-jadson","Jadson",16,"M","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"square",br:3,m:"serious"});
+J("cap","cap-portilla","Juan Portilla",27,"M","Titular",{s:"b",h:"k",st:"slick",f:"oval",m:"serious",x:["part"]});
+J("cap","cap-garcia","Alejandro García",17,"M","Titular",{s:"d",h:"k",st:"short",f:"oval",m:"smile"});
+J("cap","cap-felipinho","Felipinho",5,"M","Titular",{s:"c",h:"k",st:"fade",f:"long",br:3,m:"serious"});
+J("cap","cap-zapelli","Bruno Zapelli",10,"M","Titular",{s:"a",h:"k",st:"fringe",f:"round",m:"serious"});
+J("cap","cap-riquelme","Riquelme",63,"M","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"grin"});
+J("cap","cap-joaocruz","João Cruz",8,"M","Titular",{s:"c",h:"d",st:"fringe",f:"oval",m:"grin"});
+J("cap","cap-kogitzki","Dudu Kogitzki",53,"M","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"neutral"});
+J("cap","cap-kerwin","Kerwin Vargas",18,"A","Titular",{s:"d",h:"k",st:"bun",b:["mustThin","stubble"],f:"oval",m:"smirk",x:["tatSmall"]});
+J("cap","cap-rivaldo","Jorge Rivaldo",19,"A","Titular",{s:"d",h:"k",st:"afro",b:["mustThin","goatee"],f:"oval",m:"serious",x:["tatSmall"]});
+J("cap","cap-mendoza","Steven Mendoza",7,"A","Titular",{s:"f",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"neutral"});
+J("cap","cap-viveros","Kevin Viveros",9,"A","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"grin"});
+J("cap","cap-peixoto","Renan Peixoto",70,"A","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("cap","cap-leozinho","Leozinho",21,"A","Titular",{s:"d",h:"k",st:"buzz",b:["mustThin","goatee"],f:"oval",br:1,m:"grin"});
+J("cap","cap-chiqueti","Felipe Chiqueti",47,"A","Titular",{s:"b",h:"d",st:"wavy",b:["mustThin","goatee"],f:"oval",br:3,m:"neutral"});
+J("cap","cap-renanviana","Renan Viana",50,"A","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","stubble"],f:"round",m:"grin"});
+
+/* Atlético-MG · fotos do site oficial (atletico.com.br), 2026-10-14 */
+J("cam","cam-leoduarte","Léo Duarte",3,"D","Titular",{s:"b",h:"b",st:"fade",b:["full","must"],f:"oval",m:"serious"});
+J("cam","cam-tressoldi","Ruan Tressoldi",4,"D","Titular",{s:"c",h:"k",st:"textured",b:["mustThin","goatee"],f:"oval",br:3,m:"serious",x:["earB"]});
+J("cam","cam-lyanco","Lyanco",13,"D","Titular",{s:"b",h:"p",h2:"d",st:"textured",b:["must","chin"],f:"square",m:"serious",x:["tatSmall"]});
+J("cam","cam-vitorhugo","Vitor Hugo",14,"D","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"long",m:"neutral"});
+J("cam","cam-vitao","Vitão",40,"D","Titular",{s:"b",h:"d",st:"fringe",b:["mustThin","goatee"],f:"oval",br:3,m:"neutral"});
+J("cam","cam-natanael","Natanael",2,"D","Titular",{s:"b",h:"b",st:"wavy",b:["stubble"],f:"oval",m:"neutral",x:["eyesLight"]});
+J("cam","cam-lodi","Renan Lodi",6,"D","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"grin"});
+J("cam","cam-preciado","Angelo Preciado",23,"D","Titular",{s:"f",h:"k",st:"afro",f:"oval",br:1,m:"neutral",x:["earL"]});
+J("cam","cam-pascini","Pascini",36,"D","Titular",{s:"c",h:"k",st:"wavy",b:["stubble"],f:"oval",m:"smile"});
+J("cam","cam-alexsander","Alexsander",5,"M","Titular",{s:"c",h:"k",st:"cornrows",b:["full","must"],f:"oval",m:"serious"});
+J("cam","cam-fred","Fred",7,"M","Titular",{s:"f",h:"k",st:"curltop",b:["full","must"],f:"round",m:"grin",x:["hoopB"]});
+J("cam","cam-maycon","Maycon",8,"M","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"round",br:3,m:"smile"});
+J("cam","cam-scarpa","Gustavo Scarpa",10,"M","Titular",{s:"c",h:"d",st:"messy",b:["stubble","mustThin"],f:"oval",m:"smile"});
+J("cam","cam-bernard","Bernard",11,"M","Titular",{s:"b",h:"b",st:"textured",b:["stubble","mustThin"],f:"oval",m:"smirk"});
+J("cam","cam-castano","Kevin Castaño",15,"M","Titular",{s:"b",h:"k",st:"slick",f:"oval",br:1,m:"serious",x:["tatSmall"]});
+J("cam","cam-igorgomes","Igor Gomes",17,"M","Titular",{s:"b",h:"d",st:"swept",b:["mustThin","goatee"],f:"long",br:3,m:"serious"});
+J("cam","cam-reinier","Reinier",19,"M","Titular",{s:"c",h:"k",st:"messy",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("cam","cam-alanfranco","Alan Franco",21,"M","Titular",{s:"c",h:"k",st:"slick",f:"oval",m:"grin"});
+J("cam","cam-tomasperez","Tomás Perez",25,"M","Titular",{s:"b",h:"d",st:"wavy",b:["stubble"],f:"oval",br:3,m:"smile"});
+J("cam","cam-victorhugo","Victor Hugo",30,"M","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("cam","cam-indio","Índio",38,"M","Titular",{s:"c",h:"k",st:"fringe",f:"round",m:"grin"});
+J("cam","cam-cisse","Mamady Cissé",39,"M","Titular",{s:"f",h:"k",st:"buzz",f:"round",br:1,m:"smile"});
+J("cam","cam-cassierra","Cassierra",9,"A","Titular",{s:"f",h:"k",st:"curltop",b:["goatee"],f:"oval",br:1,m:"neutral"});
+J("cam","cam-borbas","Thiago Borbas",18,"A","Titular",{s:"a",h:"d",st:"swept",f:"long",m:"serious"});
+J("cam","cam-minda","Alan Minda",27,"A","Titular",{s:"f",h:"k",st:"buzz",f:"oval",m:"serious",x:["earL"]});
+J("cam","cam-caua","Cauã Soares",29,"A","Titular",{s:"d",h:"k",st:"fade",b:["goatee"],f:"oval",m:"grin"});
+J("cam","cam-cuello","Tomás Cuello",28,"A","Titular",{s:"c",h:"k",st:"textured",f:"square",m:"serious"});
+J("cam","cam-dudu","Dudu",92,"A","Titular",{s:"b",h:"k",st:"swept",f:"oval",m:"serious",x:["tatThroat"]});
+
+/* Bahia · fotos do site oficial (esporteclubebahia.com.br), 2026-10-14 */
+J("bah","bah-zeguilherme","Zé Guilherme",66,"D","Titular",{s:"c",h:"k",st:"fade",b:["goatee"],f:"round",m:"grin"});
+J("bah","bah-romangomez","Roman Gomez",31,"D","Titular",{s:"b",h:"d",st:"wavy",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("bah","bah-juba","Luciano Juba",46,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"long",m:"smile"});
+J("bah","bah-davidduarte","David Duarte",33,"D","Titular",{s:"d",h:"k",st:"buzz",b:["must","goatee"],f:"long",m:"grin"});
+J("bah","bah-marcosvictor","Marcos Victor",44,"D","Titular",{s:"d",h:"p",h2:"k",st:"curltop",b:["goatee"],f:"oval",m:"grin",x:["earB","tatSmall"]});
+J("bah","bah-luizgustavo","Luiz Gustavo",43,"D","Titular",{s:"f",h:"k",st:"buzz",b:["goatee"],f:"long",m:"smile",x:["chain"]});
+J("bah","bah-moreno","Marco Moreno",3,"D","Titular",{s:"b",h:"b",st:"swept",f:"oval",m:"grin"});
+J("bah","bah-kanu","Kanu",4,"D","Titular",{s:"f",h:"k",st:"buzz",b:["goatee"],f:"long",m:"grin"});
+J("bah","bah-evertonribeiro","Everton Ribeiro",10,"M","Titular",{s:"c",h:"d",st:"wavy",b:["full","must"],f:"oval",m:"grin"});
+J("bah","bah-acevedo","Nicolás Acevedo",5,"M","Titular",{s:"c",h:"d",st:"slick",b:["full","must"],f:"oval",m:"smile",x:["chain"]});
+J("bah","bah-davidmartins","David Martins",63,"M","Titular",{s:"d",h:"k",st:"short",f:"round",m:"grin"});
+J("bah","bah-erick","Erick",14,"M","Titular",{s:"d",h:"k",st:"buzz",f:"round",m:"grin"});
+J("bah","bah-nestor","Nestor",11,"M","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","stubble"],f:"oval",br:3,m:"smile"});
+J("bah","bah-araujo","Michel Araujo",15,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("bah","bah-lautaro","Lautaro Lopez",18,"M","Titular",{s:"b",h:"k",st:"wavy",f:"oval",br:3,m:"smile"});
+J("bah","bah-caioalexandre","Caio Alexandre",8,"M","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("bah","bah-jeanlucas","Jean Lucas",6,"M","Titular",{s:"d",h:"k",st:"buzz",f:"long",m:"grin",x:["earB"]});
+J("bah","bah-ademir","Ademir",7,"A","Titular",{s:"d",h:"k",st:"buzz",b:["must","goatee"],f:"long",m:"grin"});
+J("bah","bah-ruanpablo","Ruan Pablo",77,"A","Titular",{s:"f",h:"k",st:"short",f:"round",m:"grin"});
+J("bah","bah-pulga","Erick Pulga",16,"A","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"grin",x:["earB"]});
+J("bah","bah-willianjose","Willian José",12,"A","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"long",m:"smile"});
+J("bah","bah-sanabria","Sanabria",23,"A","Titular",{s:"b",h:"l",h2:"k",st:"swept",f:"oval",br:3,m:"grin"});
+J("bah","bah-furquim","Kauê Furquim",57,"A","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"round",m:"grin"});
+J("bah","bah-kike","Kike Olivera",99,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"smile"});
+J("bah","bah-veliz","Alejo Veliz",9,"A","Titular",{s:"b",h:"d",st:"fade",b:["stubble"],f:"round",br:3,m:"grin"});
+J("bah","bah-everaldo","Everaldo",27,"A","Titular",{s:"b",h:"d",st:"slick",b:["full","must"],f:"oval",br:3,m:"grin",ref:"duvida"});
+
+/* Botafogo · fotos do site oficial (botafogo.com.br), 2026-10-28; números lidos das fotos */
+J("bot","bot-alextelles","Alex Telles",13,"D","Titular",{s:"c",h:"k",st:"wavy",b:["full","must"],f:"round",br:3,m:"grin"});
+J("bot","bot-anthony","Anthony",26,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("bot","bot-arthurchaves","Arthur Chaves",3,"D","Titular",{s:"b",h:"b",st:"wavy",b:["stubble"],f:"long",m:"grin"});
+J("bot","bot-ferraresi","Ferraresi",5,"D","Titular",{s:"b",h:"d",st:"wavy",f:"oval",br:3,m:"grin"});
+J("bot","bot-justino","Justino",34,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"round",m:"grin"});
+J("bot","bot-kadu","Kadu",42,"D","Titular",{s:"c",h:"d",st:"fringe",f:"oval",m:"grin"});
+J("bot","bot-kaio","Kaio",31,"D","Titular",{s:"f",h:"k",st:"buzz",b:["stubble"],f:"round",m:"smile",x:["tatSmall"]});
+J("bot","bot-monzon","Lucas Monzon",33,"D","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"grin"});
+J("bot","bot-marcal","Marçal",21,"D","Titular",{s:"c",h:"k",st:"buzz",b:["stubble"],f:"oval",br:1,m:"grin"});
+J("bot","bot-ponte","Ponte",4,"D","Titular",{s:"c",h:"d",st:"messy",b:["mustThin","stubble"],f:"oval",m:"grin",x:["tatSmall"]});
+J("bot","bot-paulinho","Paulinho",29,"D","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"round",m:"grin"});
+J("bot","bot-vitinho","Vitinho",2,"D","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("bot","bot-allan","Allan",25,"M","Titular",{s:"d",h:"k",st:"fade",b:["full","must"],f:"round",m:"grin"});
+J("bot","bot-montoro","Montoro",10,"M","Titular",{s:"b",h:"b",st:"sidefringe",f:"oval",m:"smile"});
+J("bot","bot-medina","Medina",6,"M","Titular",{s:"c",h:"d",st:"curly",b:["mustThin","goatee"],f:"oval",br:3,m:"grin"});
+J("bot","bot-danilo","Danilo",8,"M","Titular",{s:"f",h:"k",t:"p",st:"dreadsback",f:"oval",m:"grin"});
+J("bot","bot-domingos","Domingos Andrade",91,"M","Titular",{s:"f",h:"k",st:"buzz",b:["mustThin"],f:"round",m:"grin"});
+J("bot","bot-edenilson","Edenilson",88,"M","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"oval",m:"grin",x:["earL","tatSmall"]});
+J("bot","bot-huguinho","Huguinho",75,"M","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"smile"});
+J("bot","bot-barrera","Jordan Barrera",14,"M","Titular",{s:"c",h:"p",h2:"k",st:"curltop",f:"oval",m:"grin"});
+J("bot","bot-ziyech","Ziyech",22,"M","Titular",{s:"c",h:"k",st:"slick",b:["full","must"],f:"long",br:3,m:"grin"});
+J("bot","bot-danilopereira","Danilo Pereira",90,"A","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"grin"});
+J("bot","bot-kauan","Kauan Toledo",59,"A","Titular",{s:"d",h:"k",st:"buzz",f:"oval",m:"smile"});
+J("bot","bot-lucasemanuel","Lucas Emanuel",79,"A","Titular",{s:"c",h:"k",st:"fringe",f:"long",m:"serious"});
+J("bot","bot-matheusmartins","Matheus Martins",11,"A","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"grin"});
+J("bot","bot-cabral","Arthur Cabral",19,"A","Titular",{s:"c",h:"k",st:"bald",b:["full","must"],f:"oval",m:"grin"});
+J("bot","bot-juniorsantos","Júnior Santos",7,"A","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"grin"});
+J("bot","bot-kadir","Kadir",37,"A","Titular",{s:"f",h:"k",st:"short",f:"round",m:"grin"});
+J("bot","bot-villalba","Villalba",77,"A","Titular",{s:"b",h:"d",st:"short",f:"oval",br:3,m:"grin"});
+J("bot","bot-tiquinho","Tiquinho Soares",9,"A","Titular",{s:"c",h:"k",st:"swept",b:["mustThin","goatee"],f:"round",br:3,m:"smile"});
+
+/* Red Bull Bragantino · fotos do site oficial (redbullbragantino.com), 2026-10-28 */
+J("rbb","rbb-guzman","Guzmán Rodríguez",2,"D","Titular",{s:"c",h:"k",st:"fade",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("rbb","rbb-eduardosantos","Eduardo Santos",3,"D","Titular",{s:"f",h:"k",st:"short",b:["mustThin","goatee"],f:"long",m:"serious"});
+J("rbb","rbb-alix","Alix Vinícius",4,"D","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"oval",m:"serious"});
+J("rbb","rbb-fabinho","Fabinho",5,"M","Titular",{s:"b",h:"d",st:"fade",f:"long",m:"neutral"});
+J("rbb","rbb-girotto","Gabriel Girotto",6,"M","Titular",{s:"b",h:"k",st:"fade",b:["goatee"],f:"oval",br:3,m:"serious",x:["tatThroat"]});
+J("rbb","rbb-ramires","Eric Ramires",7,"M","Titular",{s:"f",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("rbb","rbb-sasha","Sasha",8,"A","Titular",{s:"b",h:"p",h2:"d",st:"swept",b:["full","must"],f:"square",m:"serious"});
+J("rbb","rbb-pitta","Pitta",9,"A","Titular",{s:"b",h:"r",st:"buzz",b:["full","must"],f:"round",m:"serious"});
+J("rbb","rbb-fernando","Fernando",11,"A","Titular",{s:"f",h:"k",st:"cornrows",b:["full","must"],f:"oval",m:"serious",x:["tatNeck"]});
+J("rbb","rbb-vanderlan","Vanderlan",12,"D","Titular",{s:"d",h:"k",st:"curltop",f:"oval",m:"neutral"});
+J("rbb","rbb-nachososa","Nacho Sosa",15,"M","Titular",{s:"b",h:"k",st:"fade",f:"oval",br:3,m:"neutral"});
+J("rbb","rbb-gustavomarques","Gustavo Marques",16,"D","Titular",{s:"f",h:"k",st:"short",b:["mustThin"],f:"round",m:"serious"});
+J("rbb","rbb-vinicinho","Vinicinho Pereira",17,"A","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"serious"});
+J("rbb","rbb-rodriguinho","Rodriguinho",20,"M","Titular",{s:"c",h:"d",st:"wavy",f:"long",m:"neutral"});
+J("rbb","rbb-lucasbarbosa","Lucas Barbosa",21,"A","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"neutral"});
+J("rbb","rbb-gustavoneves","Gustavo Neves",22,"M","Titular",{s:"c",h:"d",st:"curltop",f:"oval",m:"neutral",x:["freckles"]});
+J("rbb","rbb-santanna","Agustín Sant'Anna",23,"D","Titular",{s:"c",h:"k",st:"short",b:["stubble"],f:"square",br:3,m:"serious"});
+J("rbb","rbb-davigomes","Davi Gomes",27,"A","Titular",{s:"b",h:"k",st:"fade",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("rbb","rbb-patrick","Patrick",28,"M","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"smile"});
+J("rbb","rbb-capixaba","Juninho Capixaba",29,"D","Titular",{s:"c",h:"d",st:"slick",b:["full","must"],f:"long",br:3,m:"serious"});
+J("rbb","rbb-mosquera","Henry Mosquera",30,"A","Titular",{s:"f",h:"k",st:"curltop",f:"oval",m:"serious"});
+J("rbb","rbb-herrera","Herrera",32,"A","Titular",{s:"b",h:"d",st:"wavy",b:["stubble","mustThin"],f:"oval",br:3,m:"neutral"});
+J("rbb","rbb-hurtado","Andrés Hurtado",34,"D","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"oval",m:"serious"});
+J("rbb","rbb-matheusfernandes","Matheus Fernandes",35,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("rbb","rbb-wallaceyan","Wallace Yan",47,"A","Titular",{s:"d",h:"k",st:"fade",b:["mustThin"],f:"oval",m:"grin",x:["tatNeck"]});
+J("rbb","rbb-caue","Cauê",51,"D","Titular",{s:"d",h:"k",st:"buzz",f:"oval",m:"neutral"});
+J("rbb","rbb-marcelinho","Marcelinho",57,"A","Titular",{s:"c",h:"k",st:"afro",b:["mustThin","goatee"],f:"oval",br:3,m:"serious",x:["tatSmall"]});
+
+/* Chapecoense · fotos do site oficial (chapecoense.com), 2026-10-28 */
+J("cha","cha-doma","Doma",3,"D","Titular",{s:"a",h:"b",st:"sidefringe",f:"oval",m:"neutral"});
+J("cha","cha-joaopaulo","João Paulo",4,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThick","goatee"],f:"square",br:3,m:"serious",x:["tatNeck"]});
+J("cha","cha-kauan","Kauan",21,"D","Titular",{s:"c",h:"k",st:"swept",b:["mustThin","goatee"],f:"long",br:3,m:"neutral"});
+J("cha","cha-thyere","Rafael Thyere",15,"D","Titular",{s:"c",h:"k",st:"buzz",b:["stubble"],f:"long",m:"grin"});
+J("cha","cha-caetano","Victor Caetano",25,"D","Titular",{s:"b",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("cha","cha-vinicius","Vinicius",35,"D","Titular",{s:"d",h:"k",st:"short",b:["goatee"],f:"oval",m:"serious"});
+J("cha","cha-pacheco","Bruno Pacheco",91,"D","Titular",{s:"c",h:"k",st:"fade",b:["must","goatee"],f:"oval",m:"grin"});
+J("cha","cha-tubarao","Bruno Tubarão",20,"D","Titular",{s:"c",h:"k",st:"short",f:"long",m:"neutral"});
+J("cha","cha-dudu","Dudu",23,"D","Titular",{s:"c",h:"k",st:"bald",b:["stubble"],f:"round",m:"neutral"});
+J("cha","cha-everton","Everton",26,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"grin"});
+J("cha","cha-fernando","Fernando",12,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"neutral"});
+J("cha","cha-heitor","Heitor",5,"D","Titular",{s:"b",h:"d",st:"wavy",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("cha","cha-mancha","Mancha",6,"D","Titular",{s:"a",h:"b",st:"sidefringe",f:"round",m:"neutral",x:["tatSmall"]});
+J("cha","cha-brunomatias","Bruno Matias",16,"M","Titular",{s:"d",h:"k",st:"short",f:"round",m:"grin"});
+J("cha","cha-balieiro","Vinicius Balieiro",17,"M","Titular",{s:"c",h:"k",st:"fade",f:"round",m:"grin"});
+J("cha","cha-david","David",19,"M","Titular",{s:"b",h:"b",st:"swept",b:["stubble"],f:"oval",m:"serious",x:["tatSmall"]});
+J("cha","cha-camilo","Camilo",27,"M","Titular",{s:"b",h:"d",st:"short",b:["stubble"],f:"oval",m:"neutral"});
+J("cha","cha-rosivan","Rosivan",55,"M","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"neutral"});
+J("cha","cha-carvalheira","Rafael Carvalheira",99,"M","Titular",{s:"b",h:"d",st:"swept",f:"oval",m:"grin"});
+J("cha","cha-giovanni","Giovanni Augusto",10,"M","Titular",{s:"c",h:"k",st:"fringe",f:"oval",m:"smile",x:["tatNeck"]});
+J("cha","cha-max","Max",22,"M","Titular",{s:"d",h:"k",st:"short",f:"oval",m:"grin"});
+J("cha","cha-miguel","Miguel Carvalho",80,"M","Titular",{s:"b",h:"d",st:"curly",b:["mustThin","goatee"],f:"oval",m:"neutral"});
+J("cha","cha-robert","Robert",8,"M","Titular",{s:"c",h:"k",st:"fade",b:["must","goatee"],f:"oval",m:"serious",x:["tatSmall"]});
+J("cha","cha-yago","Yago Felipe",88,"M","Titular",{s:"c",h:"k",st:"buzz",b:["must","goatee"],f:"long",m:"neutral"});
+J("cha","cha-borrero","Dylan Borrero",77,"A","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"smirk",x:["tatNeck"]});
+J("cha","cha-rossi","Franco Rossi",29,"A","Titular",{s:"a",h:"d",st:"short",f:"oval",m:"neutral"});
+J("cha","cha-marcinho","Marcinho",7,"A","Titular",{s:"b",h:"k",st:"fade",b:["full","must"],f:"square",br:3,m:"serious"});
+J("cha","cha-garcez","Maurício Garcez",31,"A","Titular",{s:"d",h:"k",st:"short",b:["goatee"],f:"round",m:"grin"});
+J("cha","cha-rubens","Rubens",70,"A","Titular",{s:"b",h:"b",st:"swept",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("cha","cha-tulio","Túlio Eduardo",9,"A","Titular",{s:"c",h:"k",st:"short",b:["stubble"],f:"oval",m:"grin"});
+J("cha","cha-bolasie","Yannick Bolasie",11,"A","Titular",{s:"f",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"smile"});
+
+/* Corinthians · fotos do site oficial (corinthians.com.br), 2026-10-28 · números da ESPN (o site não mostra) */
+J("cor","cor-ramalho","André Ramalho",5,"D","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"long",br:3,m:"serious"});
+J("cor","cor-paulista","Gabriel Paulista",3,"D","Titular",{s:"c",h:"d",st:"swept",b:["stubble"],f:"long",m:"serious",x:["part"]});
+J("cor","cor-gustavohenrique","Gustavo Henrique",13,"D","Titular",{s:"b",h:"k",st:"curly",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("cor","cor-iago","Iago Machado",55,"D","Titular",{s:"c",h:"k",st:"curly",f:"oval",m:"neutral"});
+J("cor","cor-joaopedro","João Pedro",47,"D","Titular",{s:"c",h:"d",st:"fringe",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("cor","cor-angileri","Fabrizio Angileri",26,"D","Titular",{s:"c",h:"k",st:"spiky",b:["stubble"],f:"long",m:"grin",x:["earB"]});
+J("cor","cor-hugo","Hugo",46,"D","Titular",{s:"b",h:"d",st:"short",b:["full","must"],f:"oval",m:"neutral"});
+J("cor","cor-joaovitor","João Vitor",86,"D","Titular",{s:"d",h:"k",st:"fade",f:"oval",m:"grin"});
+J("cor","cor-matheuzinho","Matheuzinho",2,"D","Titular",{s:"c",h:"k",st:"fade",b:["stubble","mustThick"],f:"oval",br:3,m:"serious"});
+J("cor","cor-milans","Pedro Milans",20,"D","Titular",{s:"b",h:"b",st:"wavy",b:["full","must"],f:"oval",m:"grin"});
+J("cor","cor-bidu","Matheus Bidu",21,"D","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"grin",x:["earL"]});
+J("cor","cor-alexsantana","Alex Santana",80,"M","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"round",m:"grin"});
+J("cor","cor-allan","Allan",29,"M","Titular",{s:"c",h:"k",st:"curltop",b:["must","goatee"],f:"round",m:"grin"});
+J("cor","cor-andre","André",49,"M","Titular",{s:"f",h:"k",st:"buzz",f:"oval",m:"smile"});
+J("cor","cor-carrillo","André Carrillo",19,"M","Titular",{s:"d",h:"k",t:"p",st:"dreadsback",b:["mustThin","goatee"],f:"long",m:"grin",x:["earL"]});
+J("cor","cor-bidon","Breno Bidon",7,"M","Titular",{s:"b",h:"d",st:"fringe",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("cor","cor-charles","Charles",35,"M","Titular",{s:"a",h:"l",st:"sidefringe",f:"round",br:1,m:"smile"});
+J("cor","cor-dieguinho","Dieguinho",61,"M","Titular",{s:"c",h:"p",h2:"k",st:"curltop",f:"oval",m:"smile"});
+J("cor","cor-guiamorim","Gui Amorim",48,"M","Titular",{s:"c",h:"k",st:"wavy",f:"oval",m:"grin"});
+J("cor","cor-luizgustavo","Luiz Gustavo",54,"M","Titular",{s:"c",h:"d",st:"curltop",f:"oval",m:"grin"});
+J("cor","cor-matheuspereira","Matheus Pereira",23,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"neutral"});
+J("cor","cor-raniele","Raniele",14,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("cor","cor-garro","Rodrigo Garro",8,"M","Titular",{s:"b",h:"d",st:"swept",b:["stubble","mustThin"],f:"oval",m:"neutral"});
+J("cor","cor-guinegao","Gui Negão",56,"A","Titular",{s:"d",h:"k",st:"fade",f:"oval",m:"neutral"});
+J("cor","cor-kaio","Kaio César",37,"A","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"neutral",x:["earL"]});
+J("cor","cor-kayke","Kayke",31,"A","Titular",{s:"c",h:"p",h2:"k",st:"fade",f:"round",m:"grin",x:["earB"]});
+J("cor","cor-labyad","Labyad",52,"A","Titular",{s:"b",h:"d",st:"short",b:["full","must"],f:"oval",m:"smile"});
+J("cor","cor-lingard","Lingard",77,"A","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("cor","cor-memphis","Memphis",10,"A","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"oval",m:"serious",x:["headband"]});
+J("cor","cor-pedroraul","Pedro Raul",18,"A","Titular",{s:"b",h:"d",st:"curltop",b:["full","must"],f:"long",br:3,m:"neutral"});
+J("cor","cor-vitinho","Vitinho",11,"A","Titular",{s:"f",h:"k",st:"cornrows",b:["must","goatee"],f:"long",m:"serious"});
+J("cor","cor-yuri","Yuri Alberto",9,"A","Titular",{s:"b",h:"d",st:"curly",b:["full","must"],f:"oval",br:3,m:"grin"});
+
+/* Coritiba · fotos do site oficial (coritiba.com.br), 2026-10-28 */
+J("ctb","ctb-maicon","Maicon",3,"D","Titular",{s:"b",h:"d",st:"fade",b:["must","goatee"],f:"oval",m:"serious"});
+J("ctb","ctb-moledo","Moledo",4,"D","Titular",{s:"d",h:"k",st:"bald",b:["full","must"],f:"oval",m:"serious"});
+J("ctb","ctb-coser","Tiago Cóser",23,"D","Titular",{s:"b",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"neutral"});
+J("ctb","ctb-jacy","Jacy",55,"D","Titular",{s:"f",h:"k",st:"buzz",b:["chin"],f:"round",m:"serious"});
+J("ctb","ctb-tinga","Tinga",2,"D","Titular",{s:"f",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"serious"});
+J("ctb","ctb-brunomelo","Bruno Melo",26,"D","Titular",{s:"c",h:"k",st:"short",b:["stubble","must"],f:"long",m:"smile"});
+J("ctb","ctb-felipejonatan","Felipe Jonatan",6,"D","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("ctb","ctb-taverna","Lucas Taverna",86,"D","Titular",{s:"a",h:"b",st:"short",f:"oval",m:"neutral"});
+J("ctb","ctb-gelado","Rodrigo Gelado",66,"D","Titular",{s:"d",h:"k",st:"fade",b:["goatee"],f:"round",m:"serious",x:["browSlit"]});
+J("ctb","ctb-bustos","Fabricio Bustos",14,"D","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"oval",m:"neutral"});
+J("ctb","ctb-gomez","S. Gómez",19,"M","Titular",{s:"c",h:"k",st:"spiky",f:"oval",m:"smile"});
+J("ctb","ctb-vinipaulista","Vini Paulista",36,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"long",m:"neutral"});
+J("ctb","ctb-gustavo","Gustavo",39,"M","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"round",br:3,m:"grin"});
+J("ctb","ctb-josue","Josué",10,"M","Titular",{s:"b",h:"p",h2:"d",st:"textured",b:["must","goatee"],f:"long",m:"serious"});
+J("ctb","ctb-ararat","Ararat",15,"M","Titular",{s:"f",h:"k",st:"short",f:"oval",m:"smile"});
+J("ctb","ctb-tissi","Vitor Tissi",50,"M","Titular",{s:"c",h:"d",st:"sidefringe",b:["mustThin"],f:"oval",br:3,m:"neutral"});
+J("ctb","ctb-thiagosantos","Thiago Santos",21,"M","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"square",m:"serious"});
+J("ctb","ctb-richard","Richard",25,"M","Titular",{s:"c",h:"d",st:"spiky",b:["stubble","mustThick"],f:"oval",m:"serious"});
+J("ctb","ctb-fonseca","Nicolás Fonseca",5,"M","Titular",{s:"b",h:"b",st:"textured",b:["stubble"],f:"oval",m:"neutral",x:["earB"]});
+J("ctb","ctb-lavega","Lavega",7,"A","Titular",{s:"b",h:"d",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"smile"});
+J("ctb","ctb-ronier","Lucas Ronier",11,"A","Titular",{s:"c",h:"k",st:"afro",b:["must","goatee"],f:"round",m:"serious"});
+J("ctb","ctb-fabinho","Fabinho",28,"A","Titular",{s:"d",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"neutral"});
+J("ctb","ctb-pedrorocha","Pedro Rocha",32,"A","Titular",{s:"c",h:"k",st:"slick",b:["mustThin","goatee"],f:"round",m:"grin"});
+J("ctb","ctb-rodrigues","Rodrigo Rodrigues",99,"A","Titular",{s:"b",h:"d",st:"buzz",b:["full","must"],f:"long",m:"neutral"});
+J("ctb","ctb-keno","Keno",20,"A","Titular",{s:"d",h:"k",t:"k",st:"dreadsback",b:["must","goatee"],f:"oval",m:"grin"});
+J("ctb","ctb-brenolopes","Breno Lopes",77,"A","Titular",{s:"c",h:"d",st:"buzz",b:["stubble"],f:"oval",br:1,m:"neutral",x:["tatNeck"]});
+J("ctb","ctb-renatomarques","Renato Marques",78,"A","Titular",{s:"c",h:"k",st:"fade",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("ctb","ctb-brian","Brian",17,"A","Titular",{s:"c",h:"k",st:"short",b:["stubble","mustThin"],f:"oval",m:"smile"});
+J("ctb","ctb-pauloroberto","Paulo Roberto",18,"A","Titular",{s:"c",h:"k",st:"swept",b:["mustThin","goatee"],f:"oval",m:"neutral",x:["browSlit"]});
+J("ctb","ctb-david","David",33,"A","Titular",{s:"c",h:"k",st:"curly",f:"round",m:"grin"});
+
+/* Cruzeiro · fotos de jogo/treino do site oficial (cruzeiro.com.br), 2026-10-28 · 7 sem foto no site, desenhados pelo ogol.com.br */
+J("cru","cru-fabriciobruno","Fabrício Bruno",15,"D","Titular",{s:"c",h:"k",st:"wavy",b:["full","must"],f:"long",br:3,m:"grin",ref:"acao"});
+J("cru","cru-villalba","Lucas Villalba",25,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-joaomarcelo","João Marcelo",43,"D","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-william","William",12,"D","Titular",{s:"c",h:"k",st:"short",b:["full","must"],f:"oval",m:"serious",x:["cap"],ref:"acao"});
+J("cru","cru-fagner","Fagner",23,"D","Titular",{s:"b",h:"p",h2:"d",st:"fade",b:["stubble"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-kaua","Kauã Moraes",2,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"neutral",ref:"acao"});
+J("cru","cru-rojas","Gabriel Rojas",27,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-vina","Viña",6,"D","Titular",{s:"b",h:"d",st:"short",b:["full","must"],f:"long",m:"serious",ref:"acao"});
+J("cru","cru-jonathanjesus","Jonathan Jesus",34,"D","Titular",{s:"f",h:"k",st:"curltop",f:"oval",m:"serious",ref:"ogolcru"});
+J("cru","cru-romero","Lucas Romero",29,"M","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious",x:["cap"],ref:"acao"});
+J("cru","cru-lucassilva","Lucas Silva",16,"M","Titular",{s:"b",h:"d",st:"mop",b:["full","must"],f:"long",m:"neutral",ref:"acao"});
+J("cru","cru-zelucas","Zé Lucas",5,"M","Titular",{s:"d",h:"k",st:"curltop",f:"oval",m:"grin",ref:"acao"});
+J("cru","cru-matheushenrique","Matheus Henrique",7,"M","Titular",{s:"c",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"serious",ref:"acao"});
+J("cru","cru-gerson","Gerson",8,"M","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-matheuspereira","Matheus Pereira",10,"M","Titular",{s:"c",h:"g",h2:"k",st:"fade",b:["stubble"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-rhuan","Rhuan Gabriel",40,"M","Titular",{s:"c",h:"k",st:"curltop",b:["goatee"],f:"oval",br:3,m:"serious",ref:"ogolcru"});
+J("cru","cru-kaiojorge","Kaio Jorge",19,"A","Titular",{s:"c",h:"k",st:"fringe",f:"oval",m:"grin",ref:"acao"});
+J("cru","cru-arroyo","Arroyo",99,"A","Titular",{s:"d",h:"p",h2:"k",st:"curltop",b:["chin"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-pec","Gabriel Pec",77,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",m:"smile",ref:"acao"});
+J("cru","cru-wesley","Wesley",20,"A","Titular",{s:"d",h:"k",st:"curltop",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-brunorodrigues","Bruno Rodrigues",9,"A","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-marquinhos","Marquinhos",11,"A","Titular",{s:"d",h:"k",st:"fade",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-lucho","Lucho Rodríguez",97,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-villarreal","Néiser Villarreal",22,"A","Titular",{s:"f",h:"k",st:"curltop",f:"oval",m:"serious",ref:"acao"});
+J("cru","cru-wanderson","Wanderson",94,"A","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",m:"grin",ref:"ogolcru"});
+J("cru","cru-sinisterra","Sinisterra",17,"A","Titular",{s:"f",h:"k",st:"curltop",b:["goatee"],f:"round",m:"grin",ref:"ogolcru"});
+J("cru","cru-kenji","Kaique Kenji",70,"A","Titular",{s:"c",h:"k",st:"curltop",f:"oval",m:"grin",ref:"ogolcru"});
+J("cru","cru-joaocosta","João Costa",67,"A","Titular",{s:"c",h:"p",h2:"k",st:"short",b:["stubble"],f:"oval",br:3,m:"serious",ref:"ogolcru"});
+J("cru","cru-lelis","Rayan Lelis",57,"A","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"grin",ref:"ogolcru"});
+
+/* Fluminense · fotos do site oficial (fluminense.com.br), 2026-10-28 */
+J("flu","flu-samuelxavier","Samuel Xavier",2,"D","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"round",m:"grin"});
+J("flu","flu-guga","Guga",23,"D","Titular",{s:"c",h:"d",st:"cornrows",b:["full","must"],f:"oval",m:"grin",x:["tatNeck"]});
+J("flu","flu-fidelis","Júlio Fidelis",46,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"grin"});
+J("flu","flu-rene","Renê",6,"D","Titular",{s:"b",h:"d",st:"buzz",b:["full","must"],f:"oval",m:"grin"});
+J("flu","flu-arana","Guilherme Arana",13,"D","Titular",{s:"c",h:"k",st:"curltop",f:"oval",m:"smile"});
+J("flu","flu-thiagosilva","Thiago Silva",3,"D","Titular",{s:"c",h:"k",st:"short",f:"square",br:3,m:"grin",x:["cap"]});
+J("flu","flu-freytes","Freytes",22,"D","Titular",{s:"b",h:"k",st:"swept",b:["full","must"],f:"oval",br:3,m:"smile"});
+J("flu","flu-jemmes","Jemmes",44,"D","Titular",{s:"b",h:"k",st:"spiky",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("flu","flu-millan","Millán",29,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"grin"});
+J("flu","flu-ignacio","Ignácio",4,"D","Titular",{s:"b",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"smile"});
+J("flu","flu-rabello","Igor Rabello",21,"D","Titular",{s:"b",h:"d",st:"wavy",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("flu","flu-martinelli","Martinelli",8,"M","Titular",{s:"b",h:"d",st:"swept",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("flu","flu-hercules","Hércules",35,"M","Titular",{s:"d",h:"k",st:"curltop",f:"round",m:"grin"});
+J("flu","flu-nonato","Nonato",16,"M","Titular",{s:"c",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("flu","flu-otavio","Otávio",94,"M","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"round",m:"grin",x:["tatNeck"]});
+J("flu","flu-alisson","Alisson",25,"M","Titular",{s:"c",h:"k",st:"curltop",f:"round",m:"smile"});
+J("flu","flu-ganso","PH Ganso",10,"M","Titular",{s:"c",h:"k",st:"short",f:"long",m:"smile"});
+J("flu","flu-acosta","Lucho Acosta",32,"M","Titular",{s:"b",h:"p",h2:"d",st:"textured",b:["full","must"],f:"oval",m:"smile",x:["tatNeck"]});
+J("flu","flu-riquelme","Riquelme",28,"M","Titular",{s:"c",h:"k",st:"cornrows",b:["goatee"],f:"oval",m:"grin",x:["earL"]});
+J("flu","flu-serna","Serna",90,"A","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"smile"});
+J("flu","flu-canobbio","Canobbio",17,"A","Titular",{s:"b",h:"b",st:"curtains",b:["stubble"],f:"oval",m:"grin"});
+J("flu","flu-savarino","Savarino",11,"A","Titular",{s:"c",h:"k",st:"short",f:"oval",br:3,m:"smile"});
+J("flu","flu-soteldo","Soteldo",30,"A","Titular",{s:"c",h:"l",h2:"d",st:"fade",b:["stubble"],f:"round",m:"grin",x:["tatSmall"]});
+J("flu","flu-matheusreis","Matheus Reis",15,"A","Titular",{s:"d",h:"k",st:"cornrows",f:"oval",m:"grin"});
+J("flu","flu-cano","Germán Cano",14,"A","Titular",{s:"c",h:"k",st:"wavy",f:"long",m:"smile"});
+J("flu","flu-hulk","Hulk",7,"A","Titular",{s:"c",h:"k",st:"curltop",b:["stubble","must"],f:"square",br:3,m:"grin"});
+J("flu","flu-johnkennedy","John Kennedy",9,"A","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"grin"});
+J("flu","flu-castillo","Castillo",19,"A","Titular",{s:"a",h:"b",st:"swept",b:["stubble"],f:"oval",br:1,m:"smile"});
+
+/* Grêmio · fotos do site oficial (portal.gremio.net), 2026-10-28 */
+J("gre","gre-caiopaulista","Caio Paulista",38,"D","Titular",{s:"d",h:"k",st:"cornrows",b:["mustThin"],f:"oval",m:"serious",x:["tatNeck"]});
+J("gre","gre-caito","Diego Caito",27,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"grin"});
+J("gre","gre-joaopedro","João Pedro",18,"D","Titular",{s:"c",h:"d",st:"fade",b:["full","must"],f:"oval",br:3,m:"neutral"});
+J("gre","gre-marcosrocha","Marcos Rocha",14,"D","Titular",{s:"c",h:"k",st:"textured",b:["stubble"],f:"long",m:"serious"});
+J("gre","gre-marlon","Marlon",23,"D","Titular",{s:"c",h:"k",st:"short",f:"round",m:"grin"});
+J("gre","gre-pedrogabriel","Pedro Gabriel",54,"D","Titular",{s:"b",h:"d",st:"slick",b:["mustThin","goatee"],f:"oval",br:3,m:"grin"});
+J("gre","gre-athos","Athos",42,"D","Titular",{s:"d",h:"k",st:"curltop",b:["chin"],f:"oval",m:"serious"});
+J("gre","gre-balbuena","Balbuena",2,"D","Titular",{s:"c",h:"k",st:"short",b:["stubble"],f:"square",m:"serious"});
+J("gre","gre-gustavomartins","Gustavo Martins",6,"D","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+J("gre","gre-kannemann","Kannemann",4,"D","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"square",m:"serious",x:["eyesLight"]});
+J("gre","gre-luiseduardo","Luis Eduardo",43,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"serious"});
+J("gre","gre-wagner","Wagner Leonardo",3,"D","Titular",{s:"c",h:"d",st:"fade",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("gre","gre-wallace","Wallace",82,"D","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin"],f:"oval",br:3,m:"neutral"});
+J("gre","gre-danilobarbosa","Danilo Barbosa",15,"M","Titular",{s:"c",h:"k",st:"spiky",b:["mustThick","goatee"],f:"long",br:3,m:"serious"});
+J("gre","gre-dodi","Dodi",17,"M","Titular",{s:"b",h:"k",st:"short",b:["mustThin"],f:"oval",br:3,m:"neutral"});
+J("gre","gre-noriega","Noriega",8,"M","Titular",{s:"c",h:"k",st:"fade",b:["mustThin"],f:"oval",br:3,m:"neutral"});
+J("gre","gre-krovinovic","Krovinović",10,"M","Titular",{s:"b",h:"d",st:"long",b:["full","must"],f:"oval",m:"grin"});
+J("gre","gre-nardoni","Nardoni",5,"M","Titular",{s:"b",h:"d",st:"fringe",f:"oval",br:3,m:"neutral"});
+J("gre","gre-riquelme","Riquelme",65,"M","Titular",{s:"f",h:"k",st:"afro",b:["mustThin"],f:"round",m:"grin"});
+J("gre","gre-roger","Roger",47,"M","Titular",{s:"c",h:"k",st:"curltop",b:["goatee"],f:"oval",br:3,m:"smile"});
+J("gre","gre-tiago","Tiago",39,"M","Titular",{s:"b",h:"b",st:"messy",f:"oval",m:"grin"});
+J("gre","gre-villasanti","Villasanti",20,"M","Titular",{s:"b",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"smile"});
+J("gre","gre-amuzu","Amuzu",9,"A","Titular",{s:"f",h:"k",st:"buzz",b:["mustThin"],f:"round",m:"grin"});
+J("gre","gre-braithwaite","Braithwaite",22,"A","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"neutral"});
+J("gre","gre-carlosvinicius","Carlos Vinícius",95,"A","Titular",{s:"c",h:"k",st:"fade",f:"round",m:"grin"});
+J("gre","gre-enamorado","Enamorado",99,"A","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"neutral"});
+J("gre","gre-jovane","Jovane Cabral",77,"A","Titular",{s:"f",h:"k",st:"curltop",f:"long",m:"smile"});
+J("gre","gre-pavon","Pavón",7,"A","Titular",{s:"b",h:"k",st:"fade",f:"oval",br:3,m:"smile",x:["browSlit"]});
+J("gre","gre-matheusnascimento","Matheus Nascimento",30,"A","Titular",{s:"c",h:"k",st:"curly",b:["mustThin"],f:"oval",br:3,m:"grin"});
+J("gre","gre-tete","Tetê",11,"A","Titular",{s:"d",h:"k",st:"cornrows",f:"oval",m:"serious"});
+
+/* Internacional · fotos do site oficial (internacional.com.br), 2026-10-28 */
+J("int","int-felixtorres","Félix Torres",4,"D","Titular",{s:"f",h:"k",st:"buzz",b:["goatee"],f:"long",m:"serious"});
+J("int","int-mercado","Gabriel Mercado",25,"D","Titular",{s:"c",h:"k",st:"buzz",b:["stubble"],f:"long",m:"serious"});
+J("int","int-maripan","Guillermo Maripán",3,"D","Titular",{s:"b",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("int","int-juninho","Juninho",18,"D","Titular",{s:"c",h:"k",st:"curltop",b:["must","goatee"],f:"oval",m:"serious"});
+J("int","int-victorgabriel","Victor Gabriel",41,"D","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("int","int-bernabei","Bernabei",26,"D","Titular",{s:"b",h:"d",st:"textured",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("int","int-aguirre","Braian Aguirre",35,"D","Titular",{s:"c",h:"g",h2:"k",st:"curltop",f:"oval",m:"serious"});
+J("int","int-brunogomes","Bruno Gomes",15,"D","Titular",{s:"b",h:"l",h2:"d",st:"fade",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("int","int-matheusbahia","Matheus Bahia",6,"D","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("int","int-alanpatrick","Alan Patrick",10,"M","Titular",{s:"c",h:"k",st:"buzz",b:["stubble"],f:"long",m:"serious",x:["tatSmall"]});
+J("int","int-brunohenrique","Bruno Henrique",8,"M","Titular",{s:"b",h:"d",st:"short",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("int","int-calebe","Calebe",30,"M","Titular",{s:"c",h:"k",st:"curly",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("int","int-eliasson","Niclas Eliasson",17,"M","Titular",{s:"d",h:"k",st:"short",f:"round",m:"smile"});
+J("int","int-paulinho","Paulinho",27,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious",x:["tatNeck"]});
+J("int","int-ronaldo","Ronaldo",16,"M","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"serious"});
+J("int","int-thiagomaia","Thiago Maia",29,"M","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("int","int-villagra","Villagra",5,"M","Titular",{s:"b",h:"d",st:"short",b:["stubble"],f:"oval",m:"serious"});
+J("int","int-alerrandro","Alerrandro",9,"A","Titular",{s:"d",h:"k",st:"buzz",b:["must","goatee"],f:"long",m:"serious"});
+J("int","int-carbonero","Johan Carbonero",7,"A","Titular",{s:"f",h:"k",st:"curltop",f:"oval",m:"serious"});
+J("int","int-kayky","Kayky",11,"A","Titular",{s:"d",h:"k",st:"curltop",b:["goatee"],f:"oval",m:"serious",x:["tatSmall"]});
+J("int","int-sanabria","Sanabria",19,"A","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"smile",x:["tatSmall"]});
+J("int","int-vitinho","Vitinho",28,"A","Titular",{s:"c",h:"l",h2:"k",st:"fade",b:["mustThin"],f:"oval",m:"serious"});
+
+/* Mirassol · fotos do site oficial (mirassolfc.com.br), 2026-10-28 · Marcelinho e Cazonatti sem número no site */
+J("mir","mir-elias","Elias",18,"D","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"long",m:"serious"});
+J("mir","mir-cauavictor","Cauã Victor",45,"D","Titular",{s:"f",h:"k",st:"short",f:"round",m:"smile"});
+J("mir","mir-victorluis","Victor Luis",12,"D","Titular",{s:"b",h:"d",st:"swept",b:["full","must"],f:"oval",br:3,m:"smile"});
+J("mir","mir-formiga","Igor Formiga",32,"D","Titular",{s:"c",h:"k",st:"fade",b:["goatee"],f:"oval",m:"grin"});
+J("mir","mir-danielborges","Daniel Borges",20,"D","Titular",{s:"b",h:"k",st:"curly",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("mir","mir-reinaldo","Reinaldo",6,"D","Titular",{s:"d",h:"k",st:"short",b:["must","goatee"],f:"oval",m:"grin"});
+J("mir","mir-knesowitsch","Gabriel Knesowitsch",44,"D","Titular",{s:"b",h:"d",st:"swept",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("mir","mir-marcelinho","Marcelinho","–","D","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"smile"});
+J("mir","mir-willianmachado","Willian Machado",3,"D","Titular",{s:"b",h:"b",st:"swept",b:["full","must"],f:"oval",m:"smile"});
+J("mir","mir-rodrigues","Rodrigues",97,"D","Titular",{s:"c",h:"k",st:"afro",b:["full","must"],f:"oval",m:"grin"});
+J("mir","mir-lucasoliveira","Lucas Oliveira",2,"D","Titular",{s:"c",h:"k",st:"fade",b:["must","goatee"],f:"long",br:3,m:"serious"});
+J("mir","mir-joaovictor","João Victor",34,"D","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"grin"});
+J("mir","mir-wallisson","Wallisson",80,"M","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"grin",x:["tatSmall"]});
+J("mir","mir-cazonatti","Gustavo Cazonatti","–","M","Titular",{s:"b",h:"d",st:"short",b:["mustThin","goatee"],f:"oval",br:3,m:"grin"});
+J("mir","mir-japa","Japa",5,"M","Titular",{s:"b",h:"d",st:"swept",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("mir","mir-gabrielpires","Gabriel Pires",18,"M","Titular",{s:"b",h:"d",st:"swept",b:["stubble"],f:"long",m:"smile"});
+J("mir","mir-netomoura","Neto Moura",25,"M","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"grin"});
+J("mir","mir-shaylon","Shaylon",7,"M","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"neutral"});
+J("mir","mir-eduardo","Eduardo",33,"M","Titular",{s:"c",h:"k",st:"curltop",b:["must","goatee"],f:"oval",br:3,m:"grin"});
+J("mir","mir-denilson","Denilson",8,"M","Titular",{s:"c",h:"k",st:"fade",b:["goatee"],f:"oval",m:"grin"});
+J("mir","mir-chicokim","Chico Kim",10,"M","Titular",{s:"b",h:"k",st:"fringe",f:"oval",br:1,m:"smile"});
+J("mir","mir-aldofilho","Aldo Filho",21,"M","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"oval",m:"neutral"});
+J("mir","mir-zeroberto","Zé Roberto",99,"A","Titular",{s:"c",h:"k",st:"wavy",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("mir","mir-fernandinho","Fernandinho",17,"A","Titular",{s:"c",h:"k",st:"curltop",b:["goatee"],f:"round",m:"grin"});
+J("mir","mir-brunosantos","Bruno Santos",30,"A","Titular",{s:"b",h:"d",st:"slick",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("mir","mir-gustavosilva","Gustavo Silva",19,"A","Titular",{s:"c",h:"d",st:"swept",f:"oval",m:"grin",x:["tatSmall"]});
+J("mir","mir-tiquinho","Tiquinho Soares",29,"A","Titular",{s:"c",h:"k",st:"swept",b:["mustThin","goatee"],f:"round",br:3,m:"smile"});
+J("mir","mir-negueba","Negueba",11,"A","Titular",{s:"c",h:"k",st:"fade",b:["mustThin"],f:"oval",m:"grin"});
+J("mir","mir-fogaca","Nathan Fogaça",9,"A","Titular",{s:"b",h:"b",st:"swept",f:"oval",m:"smile"});
+J("mir","mir-galeano","Galeano",27,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"serious",x:["tatSmall"]});
+J("mir","mir-galdino","Galdino",17,"A","Titular",{s:"d",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"grin"});
+J("mir","mir-edsoncarioca","Edson Carioca",95,"A","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("mir","mir-carloseduardo","Carlos Eduardo",96,"A","Titular",{s:"f",h:"k",st:"short",b:["goatee"],f:"oval",m:"smile"});
+J("mir","mir-andreluis","André Luis",99,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"grin"});
+J("mir","mir-alesson","Alesson",77,"A","Titular",{s:"c",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"serious"});
+
+/* Remo · fotos do site oficial (clubedoremo.com.br), 2026-10-28 */
+J("rem","rem-tchamba","Duplexe Tchamba",18,"D","Titular",{s:"f",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"neutral"});
+J("rem","rem-joaolucas","João Lucas",2,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",br:3,m:"serious"});
+J("rem","rem-leoandrade","Léo Andrade",5,"D","Titular",{s:"b",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("rem","rem-marcelinho","Marcelinho",79,"D","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("rem","rem-marllon","Marllon",13,"D","Titular",{s:"f",h:"k",st:"buzz",b:["stubble"],f:"long",m:"serious"});
+J("rem","rem-marlon","Marlon",6,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"serious"});
+J("rem","rem-matheusalexandre","Matheus Alexandre",2,"D","Titular",{s:"f",h:"k",st:"short",f:"long",m:"serious"});
+J("rem","rem-matheusfelipe","Matheus Felipe",4,"D","Titular",{s:"d",h:"k",st:"short",b:["chin"],f:"round",m:"serious"});
+J("rem","rem-mayk","Mayk",77,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"serious",x:["tatSmall"]});
+J("rem","rem-zeivaldo","Zé Ivaldo",29,"D","Titular",{s:"c",h:"k",st:"fade",b:["must","goatee"],f:"oval",m:"serious"});
+J("rem","rem-davidbraga","David Braga",26,"M","Titular",{s:"f",h:"k",st:"buzz",b:["full","must"],f:"round",m:"grin"});
+J("rem","rem-edson","Edson",35,"M","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("rem","rem-jaderson","Jaderson",10,"M","Titular",{s:"d",h:"k",st:"fade",b:["goatee"],f:"round",m:"grin"});
+J("rem","rem-picco","Leonel Picco",15,"M","Titular",{s:"b",h:"k",st:"short",b:["stubble"],f:"long",br:3,m:"serious"});
+J("rem","rem-patrick","Patrick",8,"M","Titular",{s:"d",h:"k",st:"bald",b:["full","must"],f:"oval",m:"serious"});
+J("rem","rem-vitorbueno","Vitor Bueno",15,"M","Titular",{s:"c",h:"k",st:"short",b:["stubble","mustThin"],f:"oval",br:3,m:"serious"});
+J("rem","rem-zericardo","Zé Ricardo",55,"M","Titular",{s:"d",h:"k",st:"short",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("rem","rem-zewelison","Zé Welison",28,"M","Titular",{s:"c",h:"k",st:"bald",b:["full","must"],f:"oval",m:"serious"});
+J("rem","rem-eduardomelo","Eduardo Melo",39,"A","Titular",{s:"f",h:"k",st:"twists",b:["chin"],f:"oval",m:"serious"});
+J("rem","rem-galeano","Galeano",21,"A","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("rem","rem-jaja","Jajá",7,"A","Titular",{s:"d",h:"k",st:"short",b:["goatee"],f:"long",m:"serious"});
+J("rem","rem-poveda","Poveda",9,"A","Titular",{s:"b",h:"b",st:"short",b:["full","must"],f:"oval",m:"serious",x:["eyesLight"]});
+J("rem","rem-taliari","Taliari",19,"A","Titular",{s:"b",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("rem","rem-tico","Tico",61,"A","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious"});
+J("rem","rem-pikachu","Yago Pikachu",22,"A","Titular",{s:"c",h:"k",st:"short",b:["must","goatee"],f:"oval",m:"serious"});
+
+/* São Paulo · fotos do site oficial (saopaulofc.net), 2026-10-28 */
+J("sao","sao-toloi","Rafael Toloi",2,"D","Titular",{s:"b",h:"b",st:"short",b:["full","must"],f:"square",m:"serious"});
+J("sao","sao-arboleda","Arboleda",5,"D","Titular",{s:"f",h:"k",st:"short",b:["stubble"],f:"oval",m:"serious",x:["tatNeck"]});
+J("sao","sao-iago","Iago",12,"D","Titular",{s:"b",h:"d",st:"swept",b:["mustThin"],f:"oval",m:"grin"});
+J("sao","sao-enzo","Enzo",13,"D","Titular",{s:"c",h:"k",st:"wavy",b:["stubble"],f:"oval",br:3,m:"smile"});
+J("sao","sao-wendell","Wendell",18,"D","Titular",{s:"f",h:"k",st:"short",f:"oval",m:"serious"});
+J("sao","sao-lucasramon","Lucas Ramon",19,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",br:3,m:"smile"});
+J("sao","sao-buta","Buta",20,"D","Titular",{s:"f",h:"k",st:"short",f:"round",m:"grin"});
+J("sao","sao-cedric","Cédric",21,"D","Titular",{s:"b",h:"d",st:"short",b:["stubble"],f:"oval",br:3,m:"smile"});
+J("sao","sao-duarte","Domingos Duarte",22,"D","Titular",{s:"b",h:"r",st:"short",b:["full","must"],f:"oval",m:"smile"});
+J("sao","sao-pedrolima","Pedro Lima",32,"D","Titular",{s:"c",h:"k",st:"curly",b:["mustThin"],f:"round",m:"grin"});
+J("sao","sao-sabino","Sabino",35,"D","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"serious"});
+J("sao","sao-isac","Isac",53,"D","Titular",{s:"d",h:"k",st:"short",b:["mustThin"],f:"oval",m:"smile"});
+J("sao","sao-osorio","Osorio",54,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"serious"});
+J("sao","sao-nicolas","Nicolas",56,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",br:3,m:"serious"});
+J("sao","sao-marcosantonio","Marcos Antonio",8,"M","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin"],f:"oval",m:"smile"});
+J("sao","sao-bobadilla","Bobadilla",16,"M","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"long",br:3,m:"serious"});
+J("sao","sao-newton","Newton Jr.",28,"M","Titular",{s:"c",h:"k",st:"cornrows",b:["goatee"],f:"oval",m:"serious",x:["earB"]});
+J("sao","sao-pablomaia","Pablo Maia",29,"M","Titular",{s:"b",h:"d",st:"swept",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("sao","sao-pedroferreira","Pedro Ferreira",46,"M","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("sao","sao-djhordney","Djhordney",48,"M","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"oval",m:"grin"});
+J("sao","sao-cauly","Cauly",80,"M","Titular",{s:"b",h:"d",st:"curltop",b:["full","must"],f:"oval",br:3,m:"smile"});
+J("sao","sao-danielzinho","Danielzinho",94,"M","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("sao","sao-lucas","Lucas",7,"A","Titular",{s:"c",h:"k",st:"bald",b:["full","must"],f:"round",m:"grin"});
+J("sao","sao-calleri","Calleri",9,"A","Titular",{s:"b",h:"d",st:"textured",b:["full","must"],f:"long",br:3,m:"serious"});
+J("sao","sao-luciano","Luciano",10,"A","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"serious",x:["earL"]});
+J("sao","sao-ferreira","Ferreira",11,"A","Titular",{s:"c",h:"g",h2:"k",st:"fade",b:["stubble"],f:"long",m:"serious"});
+J("sao","sao-andresilva","André Silva",17,"A","Titular",{s:"d",h:"k",st:"short",b:["full","must"],f:"oval",m:"serious"});
+J("sao","sao-victorsa","Victor Sá",27,"A","Titular",{s:"c",h:"k",st:"fade",f:"round",m:"grin"});
+J("sao","sao-tete","Tete",34,"A","Titular",{s:"d",h:"k",st:"short",f:"round",m:"smile"});
+J("sao","sao-artur","Artur",37,"A","Titular",{s:"c",h:"k",st:"short",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("sao","sao-gustavosantana","Gustavo Santana",43,"A","Titular",{s:"b",h:"b",st:"fringe",f:"oval",m:"grin"});
+J("sao","sao-lucca","Lucca",45,"A","Titular",{s:"c",h:"p",h2:"k",st:"textured",f:"oval",m:"smile"});
+J("sao","sao-ryan","Ryan Francisco",49,"A","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+
+/* Vasco · fotos do site oficial (vasco.com.br), 2026-10-28 */
+J("vas","vas-puma","Puma Rodríguez",2,"D","Titular",{s:"b",h:"g",h2:"k",st:"swept",f:"oval",m:"smile"});
+J("vas","vas-paulohenrique","Paulo Henrique",96,"D","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",m:"serious"});
+J("vas","vas-joaovitor","João Vitor",60,"D","Titular",{s:"d",h:"k",st:"short",f:"round",m:"neutral"});
+J("vas","vas-gabriel","Gabriel",55,"D","Titular",{s:"c",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("vas","vas-saldivia","Saldivia",4,"D","Titular",{s:"b",h:"d",st:"curltop",b:["goatee"],f:"oval",br:3,m:"serious",x:["earL"]});
+J("vas","vas-robertrenan","Robert Renan",30,"D","Titular",{s:"f",h:"k",st:"short",f:"oval",m:"grin"});
+J("vas","vas-cuesta","Carlos Cuesta",46,"D","Titular",{s:"f",h:"k",st:"short",b:["chin"],f:"oval",m:"grin"});
+J("vas","vas-lucasfreitas","Lucas Freitas",43,"D","Titular",{s:"b",h:"k",st:"curltop",b:["mustThin"],f:"oval",br:3,m:"neutral"});
+J("vas","vas-walace","Walace Fernandes",64,"D","Titular",{s:"c",h:"k",st:"curly",f:"oval",m:"neutral"});
+J("vas","vas-piton","Lucas Piton",6,"D","Titular",{s:"b",h:"d",st:"swept",f:"oval",m:"grin"});
+J("vas","vas-cuiabano","Cuiabano",66,"D","Titular",{s:"f",h:"p",h2:"k",st:"fade",b:["mustThin"],f:"round",m:"grin",x:["earL"]});
+J("vas","vas-paulinho","Paulinho",29,"D","Titular",{s:"b",h:"d",st:"fringe",b:["mustThin","goatee"],f:"oval",br:3,m:"neutral"});
+J("vas","vas-tchetche","Tchê Tchê",3,"M","Titular",{s:"f",h:"k",t:"k",st:"dreadsback",b:["goatee"],f:"long",m:"serious"});
+J("vas","vas-jair","Jair",8,"M","Titular",{s:"c",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"serious"});
+J("vas","vas-thiagomendes","Thiago Mendes",23,"M","Titular",{s:"f",h:"k",st:"curltop",b:["goatee"],f:"oval",m:"serious"});
+J("vas","vas-mateuscarvalho","Mateus Carvalho",85,"M","Titular",{s:"c",h:"p",h2:"k",st:"fade",b:["mustThin"],f:"round",m:"smile",x:["earL"]});
+J("vas","vas-cauan","Cauan Barros",88,"M","Titular",{s:"c",h:"p",h2:"k",st:"short",f:"oval",m:"neutral"});
+J("vas","vas-ramonrique","Ramon Rique",83,"M","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin"],f:"oval",m:"serious"});
+J("vas","vas-sosa","Sosa",5,"M","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"oval",br:3,m:"serious"});
+J("vas","vas-rojas","Rojas",10,"M","Titular",{s:"c",h:"k",st:"fade",f:"oval",br:3,m:"neutral"});
+J("vas","vas-lescano","Lescano",22,"M","Titular",{s:"b",h:"g",h2:"k",st:"fade",f:"oval",br:3,m:"smile"});
+J("vas","vas-david","David",7,"A","Titular",{s:"c",h:"p",h2:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"serious"});
+J("vas","vas-andresgomez","Andrés Gómez",11,"A","Titular",{s:"f",h:"k",st:"short",f:"round",m:"grin"});
+J("vas","vas-nuno","Nuno Moreira",17,"A","Titular",{s:"b",h:"d",st:"curly",b:["mustThin","goatee"],f:"oval",m:"smile"});
+J("vas","vas-adson","Adson",28,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",m:"neutral",x:["earL","tatSmall"]});
+J("vas","vas-marino","Marino",18,"A","Titular",{s:"f",h:"k",st:"buzz",f:"round",m:"grin",x:["earB"]});
+J("vas","vas-brenner","Brenner",20,"A","Titular",{s:"c",h:"k",st:"curltop",b:["goatee"],f:"oval",br:3,m:"serious"});
+J("vas","vas-spinelli","Claudio Spinelli",77,"A","Titular",{s:"b",h:"l",st:"long",b:["stubble"],f:"long",m:"serious",x:["eyesLight"]});
+J("vas","vas-colidio","Colidio",9,"A","Titular",{s:"b",h:"b",st:"textured",b:["stubble"],f:"oval",m:"neutral"});
+J("vas","vas-brunoduarte","Bruno Duarte",19,"A","Titular",{s:"b",h:"d",st:"fade",b:["stubble"],f:"oval",m:"smile",x:["eyesLight"]});
+
+/* Vitória · fotos do site oficial (ecvitoria.com.br), 2026-10-28 */
+J("vit","vit-edu","Edu",43,"D","Titular",{s:"d",h:"k",st:"buzz",b:["mustThick","goatee"],f:"long",m:"serious"});
+J("vit","vit-camutanga","Camutanga",4,"D","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"serious",x:["tatSmall"]});
+J("vit","vit-darlan","Darlan",3,"D","Titular",{s:"f",h:"k",st:"short",f:"oval",m:"serious"});
+J("vit","vit-andrei","Andrei",53,"D","Titular",{s:"d",h:"k",st:"short",f:"oval",m:"serious"});
+J("vit","vit-britez","Britez",2,"D","Titular",{s:"b",h:"k",st:"curly",b:["full","must"],f:"oval",br:3,m:"neutral"});
+J("vit","vit-kauan","Kauan",18,"D","Titular",{s:"d",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+J("vit","vit-edenilson","Edenilson",26,"D","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+J("vit","vit-riccieli","Riccieli",5,"D","Titular",{s:"c",h:"k",st:"short",b:["full","must"],f:"oval",br:3,m:"serious"});
+J("vit","vit-caca","Cacá",25,"D","Titular",{s:"f",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+J("vit","vit-luancandido","Luan Cândido",36,"D","Titular",{s:"c",h:"k",st:"short",b:["must","goatee"],f:"round",m:"serious"});
+J("vit","vit-wanderson","Wanderson",69,"D","Titular",{s:"c",h:"k",st:"fade",f:"oval",m:"serious"});
+J("vit","vit-mateussilva","Mateus Silva",98,"D","Titular",{s:"c",h:"k",st:"short",b:["mustThin","goatee"],f:"long",br:3,m:"serious"});
+J("vit","vit-fabiano","Fabiano Souza",70,"D","Titular",{s:"c",h:"k",st:"cornrows",b:["mustThin"],f:"oval",m:"serious"});
+J("vit","vit-nathanmendes","Nathan Mendes",45,"D","Titular",{s:"d",h:"k",st:"fade",b:["must","goatee"],f:"oval",m:"serious"});
+J("vit","vit-jamerson","Jamerson",83,"D","Titular",{s:"d",h:"k",st:"curltop",b:["mustThin","goatee"],f:"oval",br:3,m:"serious"});
+J("vit","vit-ramon","Ramon",13,"D","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"long",m:"serious"});
+J("vit","vit-dudu","Dudu",21,"M","Titular",{s:"f",h:"k",st:"short",b:["stubble"],f:"round",m:"serious"});
+J("vit","vit-hiago","Hiago",44,"M","Titular",{s:"c",h:"k",st:"curly",b:["mustThin"],f:"oval",m:"neutral"});
+J("vit","vit-almaraz","Alejandro Almaraz",46,"M","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"neutral"});
+J("vit","vit-pochettino","Pochettino",8,"M","Titular",{s:"b",h:"d",st:"slick",b:["stubble"],f:"oval",m:"neutral"});
+J("vit","vit-wendell","Wendell",41,"M","Titular",{s:"f",h:"k",st:"short",f:"oval",m:"grin"});
+J("vit","vit-rubenismael","Rúben Ismael",16,"M","Titular",{s:"b",h:"d",st:"short",b:["stubble","must"],f:"oval",br:3,m:"neutral"});
+J("vit","vit-martinez","Martínez",6,"M","Titular",{s:"b",h:"d",st:"textured",b:["stubble"],f:"oval",m:"neutral",x:["eyesLight"]});
+J("vit","vit-zevitor","Zé Vitor",88,"M","Titular",{s:"c",h:"k",st:"short",f:"oval",br:3,m:"neutral"});
+J("vit","vit-caique","Caíque Gonçalves",95,"M","Titular",{s:"d",h:"k",st:"short",b:["mustThick","goatee"],f:"oval",br:3,m:"serious"});
+J("vit","vit-matheuzinho","Matheuzinho",10,"M","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",m:"serious"});
+J("vit","vit-walace","Walace",15,"M","Titular",{s:"d",h:"k",st:"buzz",f:"oval",m:"serious"});
+J("vit","vit-baralhas","Baralhas",44,"M","Titular",{s:"b",h:"k",st:"fade",b:["stubble"],f:"oval",br:3,m:"grin"});
+J("vit","vit-alexbruno","Alex Bruno",9,"A","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"oval",m:"serious"});
+J("vit","vit-tarzia","Tarzia",12,"A","Titular",{s:"a",h:"b",st:"slick",b:["mustThin","goatee"],f:"oval",br:1,m:"neutral"});
+J("vit","vit-fabri","Fabri",23,"A","Titular",{s:"c",h:"k",st:"curly",b:["must","goatee"],f:"oval",br:3,m:"serious"});
+J("vit","vit-marinho","Marinho",7,"A","Titular",{s:"c",h:"k",st:"fade",b:["must","goatee"],f:"oval",m:"serious"});
+J("vit","vit-lucassilva","Lucas Silva",20,"A","Titular",{s:"c",h:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"grin"});
+J("vit","vit-erick","Erick",33,"A","Titular",{s:"c",h:"k",st:"fade",b:["stubble"],f:"oval",m:"neutral"});
+J("vit","vit-pato","Anderson Pato",28,"A","Titular",{s:"f",h:"p",h2:"k",st:"short",f:"round",m:"grin"});
+J("vit","vit-kayzer","Kayzer",79,"A","Titular",{s:"a",h:"d",st:"short",b:["stubble"],f:"oval",m:"neutral"});
+J("vit","vit-rene","Renê",91,"A","Titular",{s:"c",h:"k",st:"short",b:["mustThin"],f:"round",m:"grin"});
+J("vit","vit-osvaldo","Osvaldo",11,"A","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"neutral"});
+
+/* Santos · fotos e números do ogol.com.br (o site do Santos bloqueou o download), 2026-10-28 */
+J("san","san-joaoalencar","João Alencar",42,"D","Titular",{s:"d",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"serious",ref:"ogol"});
+J("san","san-ananias","João Ananias",26,"D","Titular",{s:"c",h:"k",st:"fade",b:["mustThin","goatee"],f:"oval",m:"grin",ref:"ogol"});
+J("san","san-luanperes","Luan Peres",14,"D","Titular",{s:"b",h:"d",st:"swept",b:["full","must"],f:"long",m:"serious",ref:"ogol"});
+J("san","san-verissimo","Lucas Veríssimo",4,"D","Titular",{s:"c",h:"k",st:"swept",b:["mustThin","goatee"],f:"long",m:"serious",x:["earB"],ref:"ogol"});
+J("san","san-escobar","Escobar",31,"D","Titular",{s:"b",h:"k",st:"fade",f:"oval",br:3,m:"smile",x:["earB"],ref:"ogol"});
+J("san","san-gonzaga","Rafael Gonzaga",38,"D","Titular",{s:"c",h:"k",st:"short",f:"oval",m:"serious",ref:"ogol"});
+J("san","san-lira","Vinícius Lira",3,"D","Titular",{s:"c",h:"d",st:"fade",b:["goatee"],f:"oval",m:"serious",ref:"ogol"});
+J("san","san-davizinho","Davizinho",27,"D","Titular",{s:"c",h:"k",st:"short",b:["goatee"],f:"oval",m:"grin",ref:"ogolDavi"});
+J("san","san-igorvinicius","Igor Vinícius",18,"D","Titular",{s:"c",h:"k",st:"spiky",b:["mustThin"],f:"oval",m:"serious",x:["earB"],ref:"ogol"});
+J("san","san-rodinei","Rodinei",23,"D","Titular",{s:"d",h:"k",st:"curltop",b:["full","must"],f:"oval",m:"grin",ref:"ogol"});
+J("san","san-coutinho","Coutinho",11,"M","Titular",{s:"c",h:"d",st:"curltop",b:["goatee"],f:"oval",br:3,m:"grin",ref:"ogol"});
+J("san","san-bontempo","Gabriel Bontempo",8,"M","Titular",{s:"c",h:"d",st:"textured",f:"oval",m:"grin",ref:"ogol"});
+J("san","san-menino","Gabriel Menino",25,"M","Titular",{s:"c",h:"d",st:"swept",b:["must","goatee"],f:"oval",m:"grin",ref:"ogol"});
+J("san","san-lima","Lima",45,"M","Titular",{s:"c",h:"k",st:"short",b:["mustThin","goatee"],f:"oval",m:"smile",ref:"ogol"});
+J("san","san-miguelito","Miguelito",30,"M","Titular",{s:"c",h:"k",st:"fringe",f:"oval",m:"grin",ref:"ogol"});
+J("san","san-neymar","Neymar Jr",10,"M","Titular",{s:"c",h:"d",st:"fade",b:["full","must"],f:"oval",m:"smile",x:["tatNeck"],ref:"ogol"});
+J("san","san-arthur","Arthur",6,"M","Titular",{s:"b",h:"b",st:"short",b:["stubble"],f:"oval",m:"neutral",ref:"ogol"});
+J("san","san-gustavohenrique","Gustavo Henrique",48,"M","Titular",{s:"c",h:"d",st:"short",f:"oval",br:3,m:"neutral",ref:"ogol"});
+J("san","san-schmidt","João Schmidt",5,"M","Titular",{s:"b",h:"d",st:"buzz",b:["full","must"],f:"long",m:"serious",ref:"ogol"});
+J("san","san-oliva","Oliva",28,"M","Titular",{s:"b",h:"k",st:"short",f:"oval",m:"serious",ref:"ogol"});
+J("san","san-pierri","Samuel Pierri",81,"M","Titular",{s:"c",h:"d",st:"fringe",f:"oval",m:"serious",ref:"ogol"});
+J("san","san-arao","Willian Arão",15,"M","Titular",{s:"c",h:"k",st:"afro",b:["full","must"],f:"oval",m:"serious",ref:"ogol"});
+J("san","san-barreal","Barreal",22,"A","Titular",{s:"b",h:"d",st:"short",f:"oval",m:"neutral",x:["tatSmall"],ref:"ogol"});
+J("san","san-caballero","Caballero",17,"A","Titular",{s:"c",h:"k",st:"fade",f:"round",m:"grin",ref:"ogol"});
+J("san","san-everton","Everton",7,"A","Titular",{s:"b",h:"d",st:"buzz",b:["goatee"],f:"oval",m:"serious",x:["tatNeck"],ref:"ogol"});
+J("san","san-gabigol","Gabriel Barbosa",9,"A","Titular",{s:"c",h:"g",h2:"k",st:"fade",b:["full","must"],f:"oval",br:3,m:"serious",ref:"ogol"});
+J("san","san-moises","Moisés",21,"A","Titular",{s:"c",h:"k",st:"buzz",b:["full","must"],f:"oval",m:"grin",ref:"ogol"});
+J("san","san-rony","Rony",33,"A","Titular",{s:"c",h:"k",st:"curltop",b:["goatee"],f:"round",m:"grin",ref:"ogol"});
+J("san","san-thaciano","Thaciano",16,"A","Titular",{s:"c",h:"k",st:"bald",b:["full","must"],f:"oval",m:"serious",ref:"ogol"});
+
+const NEW=new Set(["marlon","evangelista","mauricio","carrascal","plata"]);
+/* códigos PAL 01, FLA 01... na ordem do elenco */
+const seq={};PLAYERS.forEach(p=>{seq[p.club]=(seq[p.club]||0)+1;p.code=CLUBS[p.club].code+" "+String(seq[p.club]).padStart(2,"0");});
+
+/* ================== DESENHO CARTOON (busto) ==================
+   cabeça: centro (100,74); olhos em y 80; boca em y 106; queixo perto de y 118 */
+const INK="#2B1D00";
+let UID=0;
+const HEAD={
+  oval:`<ellipse cx="100" cy="74" rx="38" ry="44"/>`,
+  round:`<ellipse cx="100" cy="75" rx="41" ry="42"/>`,
+  long:`<ellipse cx="100" cy="74" rx="36" ry="46"/>`,
+  square:`<path d="M62 70 Q62 30 100 30 Q138 30 138 70 L136 94 Q132 114 114 119 Q100 122 86 119 Q68 114 64 94 Z"/>`
+};
+const st=`stroke="${INK}" stroke-width="2" stroke-linejoin="round"`;
+const shine=(d,o)=>`<path d="${d}" stroke="#FFFFFF" stroke-opacity="${o||.2}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+const circles=(h,pts,r,sw)=>`<g fill="${h}" stroke="${INK}" stroke-width="${sw||1.6}">${pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join("")}</g>`;
+/* cabelo: back fica atrás da cabeça, front por cima; fade = lados raspados */
+const HAIR={
+  buzz:{fade:1,front:h=>`<path d="M62 70 Q60 27 100 26 Q140 27 138 70 Q134 51 122 46 Q100 40 78 46 Q66 51 62 70 Z" fill="${h}" opacity=".95"/>`+shine("M76 38 Q100 30 124 38",.18)},
+  short:{front:h=>`<path d="M60 74 Q54 22 100 21 Q146 22 140 74 Q138 56 128 50 Q116 40 102 46 Q90 38 78 47 Q64 54 60 74 Z" fill="${h}" ${st}/>`+shine("M80 30 Q96 25 112 28")},
+  slick:{fade:1,front:h=>`<path d="M62 68 Q54 18 106 18 Q146 22 138 66 Q136 50 124 44 Q104 36 84 44 Q68 50 62 68 Z" fill="${h}" ${st}/>`+shine("M78 32 Q100 24 126 32 M76 40 Q100 31 130 41",.25)},
+  spiky:{front:h=>`<path d="M60 72 Q54 32 70 27 L70 13 L82 23 L90 8 L100 21 L111 7 L117 22 L130 12 L129 28 Q146 34 140 72 Q136 54 124 48 Q100 40 78 48 Q64 54 60 72 Z" fill="${h}" ${st}/>`},
+  curly:{front:h=>circles(h,[[62,64],[63,49],[70,36],[82,27],[96,22],[110,23],[123,29],[133,39],[138,52],[138,65],[84,42],[100,36],[116,42]],11.5)},
+  long:{back:h=>`<path d="M57 70 Q50 20 100 18 Q150 20 143 70 L149 140 L127 140 L131 84 L69 84 L73 140 L51 140 Z" fill="${h}" ${st}/>`,
+        front:h=>`<path d="M60 78 Q55 24 100 22 Q145 24 140 78 Q134 52 110 44 Q104 54 100 44 Q96 54 90 44 Q66 52 60 78 Z" fill="${h}" ${st}/>`},
+  bun:{back:h=>`<circle cx="100" cy="19" r="13" fill="${h}" ${st}/>`,
+       front:h=>`<path d="M62 70 Q58 27 100 26 Q142 27 138 70 Q132 50 100 46 Q68 50 62 70 Z" fill="${h}" ${st}/>`},
+  bald:{front:()=>`<ellipse cx="84" cy="42" rx="11" ry="5.5" fill="#FFFFFF" opacity=".3" transform="rotate(-20 84 42)"/>`},
+  twists:{front:h=>`<g fill="${h}" stroke="${INK}" stroke-width="1.4">${[[63,60],[65,46],[72,34],[82,26],[94,21],[106,21],[118,26],[128,34],[135,46],[137,60],[88,36],[100,32],[112,36]].map(([x,y])=>`<rect x="${x-5}" y="${y-9}" width="10" height="18" rx="5" transform="rotate(${(x-100)*1.3} ${x} ${y})"/>`).join("")}</g>`},
+  fringe:{front:h=>`<path d="M58 80 Q50 20 100 19 Q150 20 142 80 Q138 60 130 58 Q124 45 112 54 Q102 43 92 54 Q80 45 72 58 Q62 60 58 80 Z" fill="${h}" ${st}/>`},
+  /* cortes novos, tirados das fotos */
+  curltop:{fade:1,front:h=>`<path d="M66 60 Q64 28 100 26 Q136 28 134 60 Q128 48 100 45 Q72 48 66 60 Z" fill="${h}"/>`+circles(h,[[70,50],[76,40],[86,33],[100,30],[114,33],[124,40],[130,50],[82,46],[94,41],[106,41],[118,46]],7.5,1.3)},
+  wavy:{front:h=>`<path d="M60 74 Q52 20 100 16 Q148 20 140 74 Q138 58 130 50 Q124 38 112 44 Q104 34 94 42 Q82 36 76 46 Q64 52 60 74 Z" fill="${h}" ${st}/>`+shine("M74 30 Q82 24 90 30 Q98 22 108 28 Q116 22 126 30",.22)},
+  fade:{fade:1,front:h=>`<path d="M64 64 Q60 26 100 24 Q140 26 136 64 Q132 50 124 48 L118 52 L112 46 L104 51 L96 46 L88 51 L82 46 L76 50 Q68 52 64 64 Z" fill="${h}" ${st}/>`+shine("M82 32 Q100 27 118 32")},
+  afro:{back:h=>circles(h,[[64,48],[68,30],[80,16],[94,9],[108,9],[122,16],[132,30],[136,48]],15,2),
+        front:h=>circles(h,[[66,52],[72,38],[84,28],[100,24],[116,28],[128,38],[134,52],[90,40],[110,40]],10,1.4)},
+  swept:{fade:1,front:h=>`<path d="M63 66 Q54 14 100 10 Q146 14 137 66 Q134 44 120 40 Q100 34 80 42 Q67 48 63 66 Z" fill="${h}" ${st}/>`+shine("M76 40 Q84 22 100 18 M92 38 Q100 22 114 18 M110 38 Q118 24 128 26",.22)},
+  messy:{front:h=>`<path d="M60 76 Q52 20 100 17 Q148 20 140 76 Q138 60 130 54 L70 54 Q62 60 60 76 Z" fill="${h}" ${st}/>`+circles(h,[[72,52],[84,50],[96,53],[108,50],[120,53],[130,56],[78,24],[94,18],[110,19],[124,26]],8,1.4)},
+  sidefringe:{fade:1,front:h=>`<path d="M63 70 Q56 22 100 20 Q144 22 137 64 Q130 46 114 46 Q96 50 82 62 Q72 66 63 70 Z" fill="${h}" ${st}/>`+shine("M120 32 Q104 36 88 48",.25)},
+  textured:{fade:1,front:h=>`<path d="M62 68 Q56 24 100 20 Q144 24 138 68 Q134 50 126 46 L122 37 L114 45 L108 35 L100 44 L92 35 L86 45 L78 39 L74 50 Q66 54 62 68 Z" fill="${h}" ${st}/>`},
+  undercut:{fade:1,back:h=>`<path d="M121 96 Q127 116 122 136" stroke="${h}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
+            front:h=>`<path d="M70 50 Q66 14 100 6 Q134 12 130 50 Q126 40 117 38 L113 29 L107 38 L100 26 L93 38 L87 29 L83 40 Q74 42 70 50 Z" fill="${h}" ${st}/>`+shine("M88 22 Q100 12 114 18",.22)},
+  frosted:{fade:1,front:(h,tp)=>{const g="fr"+(++UID);return `<defs><linearGradient id="${g}" x1="0" y1="1" x2="0" y2="0"><stop offset=".5" stop-color="${h}"/><stop offset=".78" stop-color="${tp}"/></linearGradient></defs><path d="M63 64 Q57 24 82 15 L83 2 L94 11 L102 -1 L109 11 L121 3 L120 18 Q141 26 137 64 Q133 47 121 43 Q100 37 79 43 Q67 47 63 64 Z" fill="url(#${g})" ${st}/>`+shine("M86 30 Q92 18 98 12 M104 28 Q110 18 116 12",.35);}},
+  cornrows:{fade:1,back:h=>`<path d="M100 26 Q112 60 118 98 L110 100 Q104 64 96 30 Z" fill="${h}" ${st}/>`,front:h=>`<path d="M63 66 Q57 22 100 20 Q143 22 137 66 Q133 50 120 46 Q100 42 80 46 Q67 50 63 66 Z" fill="${h}" ${st}/><path d="M78 46 Q82 30 92 22 M90 44 Q94 30 100 21 M102 44 Q106 30 110 22 M114 46 Q118 32 122 26" stroke="#FFFFFF" stroke-opacity=".28" stroke-width="1.6" fill="none" stroke-linecap="round"/>`},
+  dreadsback:{back:(h,tp)=>`<g stroke="${INK}" stroke-width="1" fill="${tp}">${[[70,64],[78,68],[122,68],[130,64]].map(([x,y],i)=>`<path d="M${x-2.4} ${y} Q${x-6+i*3} ${y+34} ${x-4+i*2} ${y+62} L${x+0.6+i*2} ${y+62} Q${x-1+i*3} ${y+34} ${x+2.4} ${y} Z"/>`).join("")}</g>`,front:h=>`<path d="M62 70 Q58 27 100 26 Q142 27 138 70 Q132 50 100 46 Q68 50 62 70 Z" fill="${h}" ${st}/>`},
+  curtains:{front:h=>`<path d="M57 88 Q48 18 100 15 Q152 18 143 88 Q139 64 126 53 Q112 44 100 33 Q88 44 74 53 Q61 64 57 88 Z" fill="${h}" ${st}/><path d="M100 17 Q99 25 100 33" stroke="${INK}" stroke-opacity=".35" stroke-width="1.4" fill="none"/>`+shine("M76 34 Q86 24 96 21 M106 22 Q118 25 126 33",.3)},
+  mop:{front:h=>`<path d="M57 80 Q46 16 100 12 Q154 16 143 80 Q140 62 132 58 Q128 46 118 52 Q110 42 100 50 Q90 42 82 52 Q72 46 68 58 Q60 62 57 80 Z" fill="${h}" ${st}/>`+circles(h,[[66,34],[80,20],[100,14],[120,20],[134,34]],9,1.4)+shine("M78 36 Q86 30 94 36 M106 34 Q114 28 122 34",.22)}
+};
+const fadeSides=h=>`<path d="M60 86 Q57 66 64 54 L70 56 Q66 70 66 86 Z M140 86 Q143 66 136 54 L130 56 Q134 70 134 86 Z" fill="${h}" opacity=".42"/>`;
+/* barba e bigode: cada pedaço é uma camada */
+const FACEHAIR={
+  stubble:h=>`<path d="M62 82 Q62 118 100 123 Q138 118 138 82 Q134 102 122 106 Q112 99 100 100 Q88 99 78 106 Q66 102 62 82 Z" fill="${h}" opacity=".24"/>`,
+  full:h=>`<path d="M61 80 Q60 122 100 127 Q140 122 139 80 Q135 102 123 106 Q112 98 100 99 Q88 98 77 106 Q65 102 61 80 Z" fill="${h}" opacity=".88" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>`,
+  must:h=>`<path d="M87 99 Q100 93 113 99 Q107 101 100 99.5 Q93 101 87 99 Z" fill="${h}" opacity=".92"/>`,
+  mustThin:h=>`<path d="M89 100.5 Q100 96.5 111 100.5" stroke="${h}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".9"/>`,
+  mustThick:h=>`<path d="M83 102 Q90 92 100 97 Q110 92 117 102 Q109 99.5 100 100.5 Q91 99.5 83 102 Z" fill="${h}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`,
+  mustRetro:h=>`<path d="M86 104 Q87 98 100 98 Q113 98 114 104" stroke="${h}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
+  goatee:h=>`<path d="M92 113 Q100 125 108 113 Q100 116.5 92 113 Z" fill="${h}" opacity=".92"/>`,
+  chin:h=>`<path d="M83 109 Q85 127 100 129 Q115 127 117 109 Q109 116 100 115.5 Q91 116 83 109 Z" fill="${h}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`
+};
+const MOUTH={
+  grin:`<path d="M85 103 Q100 121 115 103 Z" fill="#7A1F33" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/><path d="M86.5 103.6 L113.5 103.6 Q112.5 108 100 108.6 Q87.5 108 86.5 103.6 Z" fill="#FFFFFF"/><ellipse cx="100" cy="113.5" rx="6" ry="2.6" fill="#E86A7A"/>`,
+  smile:`<path d="M88 105 Q100 114 112 105" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M86.5 103.5 L88.5 105.5 M113.5 103.5 L111.5 105.5" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`,
+  serious:`<path d="M89 107 Q100 104.5 111 107" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+  neutral:`<path d="M90 106.5 Q100 109 110 106.5" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
+  smirk:`<path d="M89 107 Q102 110 112 103" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M112 103 L114 101.5" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`
+};
+const BROW={
+  grin:[`M75 69 Q85 62 95 67`,`M105 67 Q115 62 125 69`],
+  smile:[`M75 69 Q85 63 95 67`,`M105 67 Q115 63 125 69`],
+  smirk:[`M75 68 Q85 65 95 68`,`M105 66 Q115 61 125 66`],
+  neutral:[`M75 68 Q85 64 95 68`,`M105 68 Q115 64 125 68`],
+  serious:[`M75 65 Q86 66 95 71`,`M105 71 Q114 66 125 65`]
+};
+const ROLE_ICON={
+  T:`<path d="M12 2 L21 5.5 V11 Q21 18 12 22 Q3 18 3 11 V5.5 Z" fill="currentColor"/>`,
+  S:`<path d="M10 3 H14 V10 H21 V14 H14 V21 H10 V14 H3 V10 H10 Z" fill="currentColor"/>`,
+  C:`<path d="M13 2 L4 14 H11 L10 22 L20 9 H13 Z" fill="currentColor"/>`
+};
+const star=(x,y,s)=>`<path d="M${x} ${y-s} l${s*.3} ${s*.7} ${s*.7} ${s*.3} -${s*.7} ${s*.3} -${s*.3} ${s*.7} -${s*.3} -${s*.7} -${s*.7} -${s*.3} ${s*.7} -${s*.3} z" fill="#FFD84D" stroke="#C99A00" stroke-width=".6"/>`;
+const defaultMouth=pos=>({D:"serious",M:"smile",A:"grin"})[pos];
+
+function portrait(p){
+  const c=CLUBS[p.club], lk=p.look, [skin,shade]=SKIN[lk.s], hair=HAIRC[lk.h], side=HAIRC[lk.h2||lk.h], role=ROLE[p.pos].k;
+  const mouth=lk.m||defaultMouth(p.pos), hs=HAIR[lk.st]||HAIR.short, X=k=>lk.x.includes(k);
+  const id=++UID, sp="sh"+id, bg="bg"+id, fs="fs"+id;
+  const brw=[0,2.2,3.2,4.6][lk.br];
+  /* fundo */
+  let back=`<rect width="200" height="160" fill="url(#${bg})"/>`;
+  if(p.stage==="Ídolo") back+=`<g opacity=".5">${Array.from({length:14},(_,i)=>{const a=i*360/14,r=a*Math.PI/180,d=4*Math.PI/180;return `<path d="M100 80 L${100+150*Math.cos(r-d)} ${80+150*Math.sin(r-d)} L${100+150*Math.cos(r+d)} ${80+150*Math.sin(r+d)} Z" fill="#FFFFFF"/>`;}).join("")}</g>`;
+  if(role==="T") back+=`<path d="M100 14 L156 34 V82 Q156 130 100 154 Q44 130 44 82 V34 Z" fill="#FFFFFF" opacity=".22" stroke="#FFFFFF" stroke-opacity=".5" stroke-width="3"/>`;
+  if(role==="S") back+=`<circle cx="100" cy="80" r="70" fill="none" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/><circle cx="100" cy="80" r="56" fill="#FFFFFF" opacity=".14"/>`;
+  if(role==="C") back+=`<path d="M22 20 L42 52 L30 54 L50 92 M178 20 L158 52 L170 54 L150 92" stroke="#FFFFFF" stroke-opacity=".55" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if(p.stage==="Cria") back+=`<g transform="translate(26 150)"><path d="M0 0 Q0 -12 0 -18" stroke="#2E6B2A" stroke-width="2.4" fill="none"/><path d="M0 -12 Q-11 -20 -13 -10 Q-5 -7 0 -12 Z M0 -16 Q10 -25 13 -15 Q5 -11 0 -16 Z" fill="#6CC56F" stroke="#2E6B2A" stroke-width="1.2"/></g>`;
+  if(p.stage==="Ídolo") back+=star(28,30,7)+star(170,40,5)+star(166,108,4);
+  /* camisa */
+  const stripes=kitPattern(c,sp);
+  const cBg=c.crestBg||(c.c2==="#FFFFFF"?"#FFFFFF":c.c1), cInk=c.crestInk||(c.c2==="#FFFFFF"?c.c1:"#FFFFFF");
+  const shirt=`<path d="M12 172 Q14 140 52 131 L84 123 Q100 136 116 123 L148 131 Q186 140 188 172 Z" fill="url(#${sp})" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M12 172 Q14 140 52 131 L60 129 Q40 146 40 172 Z M188 172 Q186 140 148 131 L140 129 Q160 146 160 172 Z" fill="#000" opacity=".14"/>
+    <path d="M83 123.5 Q100 140 117 123.5" stroke="${c.collar}" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M83 123.5 Q100 140 117 123.5" stroke="${INK}" stroke-width="1.2" fill="none" transform="translate(0 3.2)" opacity=".6"/>
+    <g transform="translate(140 148)"><path d="M-9 -9 H9 V2 Q9 9 0 12 Q-9 9 -9 2 Z" fill="${cBg}" stroke="${INK}" stroke-width="1.6"/><text y="3" text-anchor="middle" font-family="Baloo 2,sans-serif" font-weight="800" font-size="${c.crest.length>3?5:6.5}" fill="${cInk}">${c.crest}</text></g>`;
+  const band=X("cap")?`<g transform="rotate(-62 30 152)"><rect x="18" y="146" width="24" height="10" rx="2" fill="#FFD84D" stroke="${INK}" stroke-width="1.6"/><text x="30" y="154.4" text-anchor="middle" font-family="Baloo 2,sans-serif" font-weight="800" font-size="8.5" fill="${INK}">C</text></g>`:"";
+  /* tatuagens no pescoço */
+  const tinkk=`stroke="${INK}" stroke-opacity=".55" fill="none" stroke-linecap="round"`;
+  let tat="";
+  if(X("tat777")) tat=`<text x="100" y="128" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="6.5" fill="${INK}" opacity=".55">777</text><path d="M89 114 q2 -3 4 0 q2 3 4 0" stroke-width="1.2" ${tinkk}/><path d="M107 114 q1.5 -2.5 3 0 q1.5 2.5 3 0 q1.5 -2.5 3 0" stroke-width="1.1" ${tinkk}/>`;
+  if(X("tatNeck")) tat=`<path d="M89 113 q2 -3 4 0 q2 3 4 0 M103 113 q2 -3 4 0 q2 3 4 0 M92 120 q3 -4 6 0 q3 4 6 0 q3 -4 6 0 M90 126 l4 -3 4 3 M106 126 l4 -3 4 3" stroke-width="1.2" ${tinkk}/>`;
+  if(X("tatThroat")) tat=`<path d="M96.5 120 h7 v7 h-7 z M98 118.5 h4 M100 116 v2.5 M97.5 129 h5" stroke-width="1.2" ${tinkk}/><path d="M100 121.5 v3" stroke="#E9A23B" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>`;
+  if(X("tatSmall")) tat=`<path d="M108 120 l2 -3 2 3 -2 3 z" stroke-width="1.1" ${tinkk}/>`;
+  /* olhos */
+  const iris=X("eyesLight")?"#4E8C86":"#5A3A22", sleepy=X("sleepy");
+  const eye=x=>`<path d="M${x-9.5} 80 Q${x} 71 ${x+9.5} 80 Q${x} 86.5 ${x-9.5} 80 Z" fill="#FFFFFF" stroke="${INK}" stroke-width="1.5"/>
+    <circle cx="${x}" cy="79.6" r="4.8" fill="${iris}"/><circle cx="${x}" cy="79.6" r="2.4" fill="#120A04"/><circle cx="${x+1.7}" cy="77.8" r="1.5" fill="#FFFFFF"/>
+    ${sleepy?`<path d="M${x-10.5} 80.6 Q${x} 69 ${x+10.5} 80.6 Q${x} 78.2 ${x-10.5} 80.6 Z" fill="${skin}" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>`
+            :`<path d="M${x-9.5} 80 Q${x} 71 ${x+9.5} 80" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`}`;
+  const ear=(x,dir)=>`<ellipse cx="${x}" cy="81" rx="7" ry="10" fill="${skin}" stroke="${INK}" stroke-width="2"/><path d="M${x-dir} 76 Q${x-dir*5} 81 ${x-dir} 86" stroke="${shade}" stroke-width="2" fill="none"/>`;
+  const stud=x=>`<circle cx="${x}" cy="90" r="2.4" fill="#ECEEF5" stroke="${INK}" stroke-width="1.1"/>`;
+  return `<svg viewBox="0 0 200 160" preserveAspectRatio="xMidYMax slice" role="img" aria-label="${p.name} em desenho cartoon">
+  <defs>${stripes}
+    <radialGradient id="${bg}" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="${p.stage==="Ídolo"?"#FFF3C4":p.stage==="Cria"?"#E8FFE0":"#FFF8DE"}"/><stop offset=".55" stop-color="${p.stage==="Ídolo"?"#F5C451":p.stage==="Cria"?"#9ED98F":"#9EDCF0"}"/><stop offset="1" stop-color="${c.acc}"/></radialGradient>
+    <clipPath id="${fs}">${HEAD[lk.f]}</clipPath></defs>
+  ${back}
+  ${hs.back?hs.back(hair,HAIRC[lk.t]||hair):""}
+  <path d="M86 98 H114 V132 Q100 138 86 132 Z" fill="${skin}" stroke="${INK}" stroke-width="2"/>
+  <path d="M86 110 Q100 122 114 110 V118 Q100 128 86 118 Z" fill="${shade}" opacity=".7"/>
+  ${tat}
+  ${shirt}${band}
+  ${ear(62,1)}${ear(138,-1)}
+  ${X("earB")?stud(62)+stud(138):X("earL")?stud(138):""}
+  ${X("freckles")?`<g fill="#B5734E" opacity=".55">${[[72,92],[77,95],[81,91],[119,91],[123,95],[128,92],[75,98],[125,98]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="1"/>`).join("")}</g>`:""}
+  ${X("chain")?`<path d="M88 126 Q100 137 112 126" stroke="#E2B13C" stroke-width="1.6" fill="none"/>`:""}
+  ${X("hoopB")?`<circle cx="63" cy="93" r="3.4" fill="none" stroke="#E2B13C" stroke-width="1.6"/><circle cx="137" cy="93" r="3.4" fill="none" stroke="#E2B13C" stroke-width="1.6"/>`:""}
+  ${X("hoopL")?`<circle cx="137" cy="93" r="3.4" fill="none" stroke="#C9CCD6" stroke-width="1.6"/>`:""}
+  ${X("crossL")?`<path d="M138 90 V97" stroke="#C9CCD6" stroke-width="1.2"/><path d="M138 96 V105 M134.8 99 H141.2" stroke="#C9CCD6" stroke-width="2" stroke-linecap="round"/><path d="M138 96 V105 M134.8 99 H141.2" stroke="${INK}" stroke-width=".6" stroke-linecap="round" opacity=".5"/>`:""}
+  <g fill="${skin}" stroke="${INK}" stroke-width="2.4">${HEAD[lk.f]}</g>
+  <g clip-path="url(#${fs})"><path d="M128 40 Q150 80 130 112 Q120 124 104 126 Q134 100 128 40 Z" fill="${shade}" opacity=".55"/></g>
+  <ellipse cx="76" cy="95" rx="7" ry="3.6" fill="#FF7F8E" opacity=".22"/><ellipse cx="124" cy="95" rx="7" ry="3.6" fill="#FF7F8E" opacity=".22"/>
+  ${lk.b.map(k=>FACEHAIR[k]((lk.h==="p"||lk.h==="l"||lk.h==="g")&&lk.h2?side:hair)).join("")}
+  ${hs.fade?fadeSides(side):""}
+  ${hs.front(hair,HAIRC[lk.t]||hair)}
+  ${X("part")?`<path d="M74 47 L86 36" stroke="${skin}" stroke-width="2" stroke-linecap="round"/>`:""}
+  ${X("headband")?`<path d="M62 57 Q100 33 138 57 L138 65 Q100 41 62 65 Z" fill="#FFFFFF" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/><text x="100" y="51.6" text-anchor="middle" font-family="Baloo 2,sans-serif" font-weight="800" font-size="7" fill="#D9A21B" stroke="${INK}" stroke-width=".35">10</text>`:""}
+  <path d="${BROW[mouth][0]} ${BROW[mouth][1]}" stroke="${lk.h==="p"||lk.h==="l"||lk.h==="g"?side:hair}" stroke-width="${brw}" fill="none" stroke-linecap="round"/>
+  ${X("browSlit")?`<path d="M119.2 61 L121.4 69" stroke="${skin}" stroke-width="1.9" stroke-linecap="round"/>`:""}
+  ${eye(85)}${eye(115)}
+  <path d="M101 82 Q97 92 94 96 Q99 100 105 97" stroke="${shade}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  ${MOUTH[mouth]}
+  </svg>`;
+}
+
+const LOOKS={};PLAYERS.forEach(p=>{LOOKS[p.key]=p.look;});
+window.ArteCartoon={
+  clubs:CLUBS,
+  looks:LOOKS,
+  players:PLAYERS,
+  portrait(def){
+    const base=PLAYERS.find(p=>p.key===def.key);
+    const look=LOOKS[def.key]||{s:"c",h:"k",st:"short",b:[],f:"oval",br:2,x:[]};
+    return portrait(Object.assign({},base||{},def,{look}));
+  },
+  frame(stage){return stage==="Ídolo"?"idolo":stage==="Cria"?"cria":"titular";}
+};
+})();
+
+</script>
+<script>
+/* ================== DADOS DOS CLUBES ================== */
+const CLUBS={
+  pal:{id:"pal",code:"PAL",main:"V",coin:true,name:"Palmeiras",c1:"#006437",c2:"#FFFFFF",stripes:"none",shorts:"#FFFFFF",socks:"#006437",
+    coach:{name:"Abel Ferreira",power:"Cabeça fria",text:"Uma vez por turno, se a moeda der COROA num ataque seu, você joga a moeda de novo."},
+    blurb:"Jovens com potencial. Dependem da moeda, mas têm mais suportes que geram energia. As crias da base evoluem."},
+  fla:{id:"fla",code:"FLA",main:"T",coin:false,name:"Flamengo",c1:"#C8102E",c2:"#111111",stripes:"h",shorts:"#FFFFFF",socks:"#111111",
+    coach:{name:"Leonardo Jardim",power:"Elenco milionário",text:"Seus Ídolos batem +10."},
+    blurb:"Elenco consolidado. Batem forte e sem moeda, mas geram pouca energia."}
+};
+const ROLE={D:"T",M:"S",A:"C"};
+const ROLENAME={T:"Tanque",S:"Suporte",C:"Carry"};
+const ROLEIC={T:"🛡️",S:"✨",C:"⚔️"};
+const SK={a:"#F1C9A5",b:"#E2B48C",c:"#C98A5B",d:"#8D5A3B",e:"#5E3A24"};
+const HC={k:"#141014",d:"#2A1A10",b:"#5A3A20",l:"#B88A4A"};
+const L=(skin,hair,style,beard)=>({skin:SK[skin],hair:HC[hair],style,beard:!!beard});
+/* jogada: nome, energia que gasta, dano, bônus da moeda (CARA soma) */
+const M=(n,cost,p,coin,extra)=>Object.assign({n,cost,p,coin:coin||0,kind:"dmg"},extra||{});
+const DEFS={};
+function P(club,key,name,num,pos,stage,hp,moves,look,from,extra){DEFS[key]=Object.assign({kind:"player",club,key,name,num,pos,role:ROLE[pos],stage,hp,moves,look,from:from||null},extra||{});}
+
+const EN={T:"Técnica",V:"Velocidade",C:"Qualquer"};
+/* Suportes atrás: poder automático no começo do seu turno (só funciona na linha de trás).
+   gen = gera 1 energia pra alguém da frente · guard = sua frente toma -10 · bonus = sua frente bate +10 */
+const SUP={
+  gen:t=>({k:"gen",t,tx:`Atrás: no começo do seu turno, gera 1 energia de ${EN[t]} pra alguém da sua frente.`}),
+  guard:{k:"guard",tx:"Atrás: seus jogadores da frente tomam -10 de dano."},
+  bonus:{k:"bonus",tx:"Atrás: seus jogadores da frente batem +10."}
+};
+/* Palmeiras: dependem da moeda, têm mais suportes que geram energia, e as crias evoluem */
+P("pal","gomez","Gustavo Gómez",15,"D","Ídolo",130,[M("Chutão",["C"],20)],L("b","k","short",1),null,{guard:10});
+P("pal","murilo","Murilo",26,"D","Titular",110,[M("Carrinho",["V"],10,20)],L("d","k","buzz"));
+P("pal","benedetti1","Benedetti",43,"D","Cria",70,[M("Chutão",["C"],10)],L("c","d","curly"));
+P("pal","benedetti2","Benedetti",43,"D","Titular",110,[M("Carrinho",["V"],20,20)],L("c","d","curly"),"benedetti1");
+P("pal","arthur1","Arthur",56,"D","Cria",70,[M("Chutão",["C"],10)],L("d","k","short"));
+P("pal","arthur2","Arthur",56,"D","Titular",100,[M("Apoio pela esquerda",["V"],20,20)],L("d","k","short"),"arthur1");
+P("pal","marlon","Marlon Freitas",17,"M","Titular",95,[M("Desarme",["T"],20,20)],L("d","k","buzz",1),null,{sup:SUP.guard});
+P("pal","andreas","Andreas Pereira",8,"M","Titular",90,[M("Bola parada",["T"],20,30)],L("b","d","short"),null,{sup:SUP.bonus});
+P("pal","evangelista","Lucas Evangelista",30,"M","Titular",90,[M("Chegada na área",["V"],20,20)],L("b","d","short",1),null,{sup:SUP.gen("V")});
+P("pal","mauricio","Maurício",18,"M","Titular",85,[M("Chute de fora",["T"],20,20)],L("c","k","curly"),null,{sup:SUP.gen("T")});
+P("pal","flaco","Flaco López",42,"A","Titular",90,[M("Pivô",["T"],30,30),M("Cabeçada no 2º pau",["V"],40,20,{esc:20,tx:"+20 a mais com Escanteio."})],L("b","d","spiky",1));
+P("pal","arias","Jhon Arias",11,"A","Titular",85,[M("Corte pra dentro",["V"],40,30)],L("e","k","buzz",1));
+P("pal","roque1","Vitor Roque",9,"A","Titular",90,[M("Arranque",["V"],30,30)],L("d","k","buzz"));
+P("pal","roque2","Vitor Roque",9,"A","Ídolo",120,[M("Tigrinho",["V"],50,30)],L("d","k","buzz"),"roque1");
+P("pal","paulinho","Paulinho",10,"A","Titular",85,[M("Chute colocado",["T"],30,30)],L("d","k","short",1));
+
+/* Flamengo: batem forte e sem moeda, mas só 2 suportes geram energia */
+P("fla","danilo","Danilo",13,"D","Ídolo",130,[M("Antecipação",["T"],20)],L("d","k","buzz",1),null,{guard:10});
+P("fla","ortiz","Léo Ortiz",3,"D","Titular",120,[M("Antecipação",["T"],20)],L("c","d","short",1));
+P("fla","pereira","Léo Pereira",4,"D","Titular",120,[M("Saída de bola",["C"],20)],L("b","d","short",1));
+P("fla","pulgar","Erick Pulgar",5,"M","Titular",110,[M("Desarme e passe",["T"],30)],L("b","k","long",1),null,{sup:SUP.guard});
+P("fla","jorginho","Jorginho",21,"M","Ídolo",110,[M("Lançamento",["T"],30)],L("a","b","short",1),null,{sup:SUP.gen("T")});
+P("fla","arrascaeta","Arrascaeta",10,"M","Ídolo",100,[M("Assistência mágica",["T"],40)],L("a","b","short",1),null,{sup:SUP.bonus});
+P("fla","delacruz","De la Cruz",18,"M","Titular",100,[M("Condução",["V"],30)],L("a","k","curly"),null,{sup:SUP.guard});
+P("fla","paqueta","Lucas Paquetá",11,"M","Titular",100,[M("Caneta",["V"],40)],L("c","k","buzz"),null,{sup:SUP.bonus});
+P("fla","carrascal","Jorge Carrascal",15,"M","Titular",100,[M("Drible curto",["V"],30)],L("c","k","short",1),null,{sup:SUP.gen("V")});
+P("fla","pedro","Pedro",9,"A","Ídolo",110,[M("Pivô e giro",["T"],50)],L("b","d","short",1));
+P("fla","bh","Bruno Henrique",27,"A","Ídolo",100,[M("Arrancada",["V"],50)],L("e","k","buzz",1));
+P("fla","lino","Samuel Lino",16,"A","Titular",90,[M("Drible",["V"],50)],L("d","k","curly"));
+P("fla","plata","Gonzalo Plata",19,"A","Titular",90,[M("Arrancada pela direita",["V"],50)],L("d","k","short"));
+
+const EV={
+  massagem:{kind:"event",key:"massagem",name:"Massagem do fisio",ic:"💆",tx:"Devolve 40 de vida a um jogador seu."},
+  mandrake:{kind:"event",key:"mandrake",name:"Pênalti mandrake",ic:"🎭",tx:"Só se o rival tiver 1 tanque ou menos. Moeda: CARA é gol! Gasta o seu ataque do turno."},
+  escanteio:{kind:"event",key:"escanteio",name:"Escanteio",ic:"🚩",tx:"Seu próximo ataque neste turno ganha +20."},
+  lancamento:{kind:"event",key:"lancamento",name:"Lançamento de 40 metros",ic:"🎯",tx:"Você pode dar mais 1 energia neste turno."},
+  diretoria:{kind:"event",key:"diretoria",name:"Diretoria perdeu a paciência",ic:"📉",tx:"Só se o rival estiver perdendo. O técnico dele é demitido e perde o poder."},
+  chuva:{kind:"stadium",key:"chuva",name:"Chuva no Maracanã",ic:"🌧️",tx:"Fica na mesa. Ataques de Velocidade gastam 1 energia a mais."},
+  caldeirao:{kind:"stadium",key:"caldeirao",name:"Caldeirão da torcida",ic:"🔥",tx:"Fica na mesa. Ataques de quem jogou esta carta ganham +10."},
+  caicai:{kind:"reaction",key:"caicai",name:"Cai-cai",ic:"🤕",tx:"Use na vez do rival, quando um ataque dele ia derrubar seu jogador. Moeda: CARA é falta e o dano não conta."},
+  var:{kind:"reaction",key:"var",name:"VAR",ic:"📺",tx:"Use na vez do rival, quando ele fizer gol. Moeda: CARA e o gol é anulado."}
+};
+const DECKS={
+  pal:{players:["gomez","murilo","benedetti1","benedetti2","arthur1","arthur2","marlon","andreas","evangelista","flaco","mauricio","arias","roque1","roque2","paulinho"],
+       events:["massagem","mandrake","escanteio","chuva","caicai","var"]},
+  fla:{players:["danilo","ortiz","pereira","pulgar","jorginho","arrascaeta","delacruz","paqueta","pedro","bh","lino","carrascal","plata"],
+       events:["massagem","lancamento","escanteio","diretoria","caldeirao","caicai","var"]}
+};
+
+/* ================== OS OUTROS 18 CLUBES ==================
+   As cartas vêm do módulo de arte (ArteCartoon.players): nome, número e posição.
+   Aqui cada jogador ganha vida, ataque e energia, e cada clube ganha a lore e a mecânica dele (LORE). */
+const LORE=/*LORE*/{"cap": {"apelido": "Furacão", "mascote": "Furacão", "estadio": "Arena da Baixada (Ligga Arena)", "tecnico": "Odair Hellmann", "tradicoes": "Campeão brasileiro de 2001, da Copa do Brasil de 2019 e bicampeão da Sul-Americana (2018 e 2021). Joga numa arena moderna e fechada, com teto retrátil e gramado sintético, onde a torcida aperta o rival o jogo inteiro.", "lore": "Na Arena da Baixada o barulho não para e o rival nunca respira. Quando o Furacão acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Caldeirão da Baixada", "estilo": "moeda", "energia": "V"}, "cam": {"apelido": "Galo", "mascote": "Galo", "estadio": "Arena MRV", "tecnico": "Eduardo Domínguez", "tradicoes": "O lema da torcida é \"Eu acredito\", nascido na Libertadores de 2013, com Ronaldinho e a defesa de pênalti de Victor. Campeão brasileiro em 1971 e 2021, tem ídolos como Reinaldo e Hulk.", "lore": "O Galo vive de noites heroicas em que um craque decide tudo. Uma vez por partida, um ataque do Atlético causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Eu Acredito", "estilo": "forte", "energia": "V"}, "bah": {"apelido": "Esquadrão de Aço", "mascote": "Super-Homem Tricolor", "estadio": "Arena Fonte Nova", "tecnico": "Rogério Ceni", "tradicoes": "Primeiro campeão nacional do Brasil (Taça Brasil de 1959) e campeão brasileiro de 1988. O apelido \"Esquadrão de Aço\" fala de um time duro, difícil de vencer.", "lore": "Um time de aço não deixa o adversário jogar. Quando o Bahia acerta um ataque, joga a moeda: se der cara, o jogador atingido não pode atacar no próximo turno.", "mecanica": "paralisia", "nome_mecanica": "Esquadrão de Aço", "estilo": "forte", "energia": "T"}, "bot": {"apelido": "Glorioso", "mascote": "Manequinho", "estadio": "Estádio Nilton Santos", "tecnico": "Tite", "tradicoes": "O clube da Estrela Solitária teve Garrincha, Nilton Santos e Didi, gênios da Seleção. Em 2024 viveu o ano mais mágico da sua história, ganhando a Libertadores e o Brasileirão.", "lore": "A estrela do Botafogo brilha forte nos jogos grandes, como Garrincha brilhava. Uma vez por partida, um ataque do Botafogo causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Estrela Solitária", "estilo": "forte", "energia": "T"}, "rbb": {"apelido": "Massa Bruta", "mascote": "Touro", "estadio": "Estádio Nabi Abi Chedid", "tecnico": "Vagner Mancini", "tradicoes": "Desde 2019 faz parte da rede Red Bull, famosa por usar dados e olheiros para achar jovens talentos baratos e vendê-los caro. Foi vice da Sul-Americana em 2021.", "lore": "O Bragantino sempre tem olheiros procurando a próxima joia. Por isso compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Olheiros do Touro", "estilo": "moeda", "energia": "V"}, "cha": {"apelido": "Verdão do Oeste", "mascote": "Índio Condá", "estadio": "Arena Condá", "tecnico": "Rafael Lacerda", "tradicoes": "Saiu do interior de Santa Catarina até a final da Sul-Americana de 2016, título que recebeu após a tragédia aérea daquele ano. Reconstruiu o time e é símbolo de força e de nunca desistir.", "lore": "A Chape aprendeu a se levantar mesmo nos piores momentos. No começo de cada turno dela, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Força Chape", "estilo": "moeda", "energia": "V"}, "cor": {"apelido": "Timão", "mascote": "Mosqueteiro", "estadio": "Neo Química Arena", "tecnico": "Clarence Seedorf", "tradicoes": "A Fiel é uma das maiores torcidas do Brasil e empurra o time com o grito \"Aqui é Corinthians\". Campeão da Libertadores e do Mundial em 2012, o clube tem fama de jogar com garra.", "lore": "Com a Fiel cantando, o rival sente a pressão a cada minuto. Quando o Corinthians acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Pressão da Fiel", "estilo": "forte", "energia": "V"}, "ctb": {"apelido": "Coxa", "mascote": "Vovô Coxa", "estadio": "Estádio Couto Pereira", "tecnico": null, "tradicoes": "Clube mais antigo do Paraná e campeão brasileiro de 1985. Já caiu e voltou à Série A várias vezes, sempre empurrado pela torcida no Alto da Glória.", "lore": "O Coxa é especialista em dar a volta por cima depois das quedas. No começo de cada turno dele, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Volta por Cima", "estilo": "moeda", "energia": "T"}, "cru": {"apelido": "Raposa", "mascote": "Raposa", "estadio": "Mineirão", "tecnico": "Artur Jorge", "tradicoes": "Bicampeão da Libertadores (1976 e 1997), recordista de Copas do Brasil e dono da Tríplice Coroa de 2003. Os times de 2013 e 2014 foram bicampeões brasileiros com ataques rápidos e envolventes.", "lore": "Como uma raposa esperta, o Cruzeiro troca de posição rápido para pegar o rival desprevenido. Ele pode fazer 2 trocas de linha por turno, em vez de 1.", "mecanica": "recuo", "nome_mecanica": "Astúcia da Raposa", "estilo": "forte", "energia": "T"}, "flu": {"apelido": "Tricolor das Laranjeiras", "mascote": "Cartola", "estadio": "Maracanã", "tecnico": "Marcão", "tradicoes": "Campeão da Libertadores de 2023, tem a torcida do pó de arroz no Maracanã. Sua base em Xerém revelou craques como Marcelo, Thiago Silva e João Pedro.", "lore": "Xerém nunca para de revelar moleques prontos para jogar. Por isso o Fluminense compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Moleques de Xerém", "estilo": "moeda", "energia": "T"}, "gre": {"apelido": "Imortal Tricolor", "mascote": "Mosqueteiro", "estadio": "Arena do Grêmio", "tecnico": "Renato Gaúcho", "tradicoes": "Tricampeão da Libertadores (1983, 1995 e 2017) e campeão mundial em 1983, com Renato Gaúcho como ídolo. O apelido \"Imortal\" vem de viradas épicas como a Batalha dos Aflitos, em 2005.", "lore": "O Imortal nunca morre, mesmo quando parece derrotado. No começo de cada turno dele, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Imortal Tricolor", "estilo": "forte", "energia": "V"}, "int": {"apelido": "Colorado", "mascote": "Saci", "estadio": "Beira-Rio", "tecnico": "Eduardo Baptista", "tradicoes": "Único campeão brasileiro invicto (1979), bicampeão da Libertadores (2006 e 2010) e campeão mundial em 2006, quando marcou forte e venceu o Barcelona de Ronaldinho.", "lore": "O Inter de 2006 parou o Barcelona com marcação apertada. Quando o Inter acerta um ataque, joga a moeda: se der cara, o jogador atingido não pode atacar no próximo turno.", "mecanica": "paralisia", "nome_mecanica": "Muralha Colorada", "estilo": "forte", "energia": "T"}, "mir": {"apelido": "Leão", "mascote": "Leão", "estadio": "Estádio José Maria de Campos Maia (Maião)", "tecnico": "Rafael Guanaes", "tradicoes": "Clube do interior paulista que estreou na Série A em 2025 e surpreendeu o país, ganhando vaga inédita na Libertadores. Joga organizado e sai rápido no contra-ataque.", "lore": "O Leão do interior espera a hora certa e dá o bote em velocidade. Ele pode fazer 2 trocas de linha por turno, em vez de 1.", "mecanica": "recuo", "nome_mecanica": "Bote do Leão", "estilo": "moeda", "energia": "V"}, "rem": {"apelido": "Leão Azul", "mascote": "Leão", "estadio": "Baenão (Estádio Evandro Almeida) e Mangueirão", "tecnico": "Thiago Carpini", "tradicoes": "Gigante do Norte, o Remo voltou à Série A em 2026 depois de décadas. Sua torcida, o \"Fenômeno Azul\", lota o Mangueirão e faz do clássico Re-Pa um dos jogos mais quentes do Brasil.", "lore": "Em Belém, o calor e o Fenômeno Azul cansam qualquer rival. Quando o Remo acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Fenômeno Azul", "estilo": "moeda", "energia": "V"}, "san": {"apelido": "Peixe", "mascote": "Baleia", "estadio": "Vila Belmiro", "tecnico": "Cuca", "tradicoes": "Casa de Pelé, o Rei do Futebol, o Santos foi bicampeão da Libertadores e do Mundial nos anos 1960 e ganhou de novo a Libertadores em 2011, com Neymar. Os \"Meninos da Vila\" são sua marca.", "lore": "O Santos sempre teve um craque capaz de uma jogada mágica, de Pelé a Neymar. Uma vez por partida, um ataque do Santos causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Magia do Rei", "estilo": "moeda", "energia": "T"}, "sao": {"apelido": "Tricolor Paulista", "mascote": "Santo Paulo", "estadio": "MorumBIS", "tecnico": "Dorival Júnior", "tradicoes": "Tricampeão da Libertadores e do Mundial, com seis títulos brasileiros. Seu maior ídolo, o goleiro Rogério Ceni, marcou mais de 100 gols, muitos deles de falta.", "lore": "No São Paulo até o goleiro fazia gol de longe, cobrando falta. Por isso os carries do São Paulo também podem atacar a linha de trás do rival.", "mecanica": "banco", "nome_mecanica": "Falta do Mito", "estilo": "forte", "energia": "T"}, "vas": {"apelido": "Gigante da Colina", "mascote": "Almirante", "estadio": "São Januário", "tecnico": "Pedro Emanuel", "tradicoes": "Pioneiro na luta contra o racismo com os Camisas Negras de 1923 e a Resposta Histórica. Campeão da Libertadores de 1998, tem como ídolos Roberto Dinamite e Juninho Pernambucano, mestre das cobranças de falta.", "lore": "As faltas de Juninho Pernambucano acertavam o gol de qualquer distância. Por isso os carries do Vasco também podem atacar a linha de trás do rival.", "mecanica": "banco", "nome_mecanica": "Cobrança do Reizinho", "estilo": "forte", "energia": "T"}, "vit": {"apelido": "Leão da Barra", "mascote": "Leão", "estadio": "Barradão (Estádio Manoel Barradas)", "tecnico": "Jair Ventura", "tradicoes": "Conhecido como fábrica de talentos, revelou nomes como Bebeto, Vampeta, Dida, Hulk e David Luiz. Foi vice-campeão brasileiro em 1993 com um time jovem.", "lore": "A base do Vitória vive revelando novos craques. Por isso o Vitória compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Fábrica do Barradão", "estilo": "moeda", "energia": "V"}}/*FIM*/;
+/* mecânicas importadas do Pokémon TCG. Funcionam como o poder do técnico (técnico demitido = perde) */
+const MECH={
+  veneno:{ic:"🧪",pk:"Veneno",tx:"Quando seu ataque acerta e o rival não cai, ele fica envenenado: perde 10 de vida no começo de cada turno dele enquanto estiver na frente."},
+  paralisia:{ic:"⚡",pk:"Paralisia",tx:"Quando seu ataque acerta e o rival não cai, joga a moeda: CARA e ele fica paralisado e não ataca no próximo turno."},
+  vstar:{ic:"🌟",pk:"Poder VSTAR",tx:"Uma vez por jogo, um ataque seu tira o dobro de vida."},
+  busca:{ic:"🔎",pk:"Busca",tx:"Você compra 1 carta a mais em todo turno."},
+  recuo:{ic:"💨",pk:"Recuo grátis",tx:"Você pode fazer 2 trocas de linha por turno em vez de 1."},
+  banco:{ic:"🎯",pk:"Dano no banco",tx:"Seus carries também podem atacar quem está atrás no rival (derrubar quem está atrás não é gol)."},
+  cura:{ic:"💚",pk:"Cura",tx:"No começo do seu turno, seu jogador da frente mais machucado recupera 20 de vida."}
+};
+const mechOf=s=>coachOn(s)?CLUBS[T_(s).club].mech:null;
+const hashS=s=>{let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}return h;};
+const MVN={
+  D:{T:["Antecipação","Saída de bola","Desarme limpo"],V:["Carrinho","Cobertura","Chutão"]},
+  M:{T:["Passe em profundidade","Bola parada","Lançamento"],V:["Condução","Tabela","Arrancada"]},
+  A:{T:["Chute colocado","Cabeçada","Finalização"],V:["Drible","Arranque","Contra-ataque"]}
+};
+for(const c of Object.values(ArteCartoon.clubs)){
+  if(CLUBS[c.id])continue;
+  const lo=LORE[c.id]||{},coin=lo.estilo!=="forte",main=lo.energia==="V"?"V":"T",alt=main==="T"?"V":"T",mech=MECH[lo.mecanica]?lo.mecanica:"busca";
+  CLUBS[c.id]={id:c.id,code:c.code,name:c.name,c1:c.c1,c2:c.c2,main,coin,mech,lore:lo,
+    coach:{name:lo.tecnico||`Técnico do ${c.name}`,power:`${MECH[mech].ic} ${lo.nome_mecanica||MECH[mech].pk}`,text:`${MECH[mech].pk} (Pokémon TCG): ${MECH[mech].tx}`},
+    blurb:`${lo.lore||""} ${coin?"Depende da moeda.":"Bate forte, sem moeda."}`.trim()};
+  const ps=ArteCartoon.players.filter(p=>p.club===c.id);
+  for(const p of ps){
+    const h=hashS(p.key),t=h%3===0?alt:main;
+    const hp={D:105,M:90,A:80}[p.pos]+((h>>>4)%3)*5;
+    const [dm,cn]=coin?{D:[10,20],M:[20,20],A:[30,30]}[p.pos]:{D:[20,0],M:[30,0],A:[40+((h>>>6)%2)*10,0]}[p.pos];
+    P(c.id,p.key,p.name,p.num,p.pos,"Titular",hp,[M(MVN[p.pos][t][(h>>>8)%3],[t],dm,cn)],null);
+  }
+  /* baralho pronto: os números mais baixos de cada posição (5 tanques, 4 suportes, 6 carries) */
+  const byNum=pos=>ps.filter(p=>p.pos===pos).sort((a,b)=>a.num-b.num).map(p=>p.key);
+  const want={D:5,M:4,A:6},pick=[];
+  for(const pos of ["D","M","A"])pick.push(...byNum(pos).slice(0,want[pos]));
+  for(const k of ps.map(p=>p.key))if(pick.length<15&&!pick.includes(k))pick.push(k);
+  const sups=[SUP.gen(main),SUP.gen(alt),SUP.guard,SUP.bonus];
+  pick.filter(k=>DEFS[k].pos==="M").forEach((k,i)=>DEFS[k].sup=sups[i%4]);
+  ps.filter(p=>p.pos==="M"&&!DEFS[p.key].sup).forEach(p=>DEFS[p.key].sup=sups[hashS(p.key)%4]);
+  const h=hashS(c.id);
+  DECKS[c.id]={players:pick,events:["massagem","escanteio","caicai","var",coin?"mandrake":"lancamento",h%2?"chuva":"caldeirao","diretoria"]};
+}
+
+/* ================== ARTE CARTOON ==================
+   O desenho vem do módulo ArteCartoon (thread "Arte das cartas"), colado no começo da página.
+   Aqui só recortamos o busto pra mostrar o rosto inteiro nas cartas pequenas. */
+const chibi=d=>ArteCartoon.portrait(d).replace("xMidYMax slice","xMidYMin slice");
+const frameOf=d=>ArteCartoon.frame(d.stage);
+/* ================== ESTADO ================== */
+let UID=0, G=null;
+const inst=d=>({uid:++UID,def:d,dmg:0,en:[],turnIn:-1,buff:0,free:false});
+const other=s=>s==="me"?"ai":"me";
+const rnd=n=>Math.floor(Math.random()*n);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const SPEED=()=>G&&G.fast?0.35:1;
+const NF=3,NB=2;
+
+function buildDeck(club){
+  const d=DECKS[club],cards=[];
+  d.players.forEach(k=>cards.push(inst(DEFS[k])));
+  d.events.forEach(k=>cards.push(inst(EV[k])));
+  return shuffle(cards);
+}
+const isBasic=c=>c.def.kind==="player"&&!c.def.from;
+function newTeam(club){
+  const T={club,deck:buildDeck(club),hand:[],discard:[],F:Array(NF).fill(null),B:Array(NB).fill(null),score:0,mull:0,
+    coachFired:false,energyLeft:1,escanteio:false,rerollUsed:false,attacked:false,switched:false,swLeft:1,vstarUsed:false};
+  for(;;){ // compra 7; sem jogador nenhum, embaralha e compra de novo
+    for(let k=0;k<7;k++)draw(T);
+    if(T.hand.some(isBasic))break;
+    T.deck.push(...T.hand);T.hand=[];shuffle(T.deck);T.mull++;
+  }
+  return T;
+}
+function draw(T){if(T.deck.length)T.hand.push(T.deck.shift());}
+function startGame(myClub,aiClub){
+  G={half:0,active:"me",phase:"setup",busy:false,sheet:null,log:[],stadium:null,fast:false,over:false,
+     t:{me:newTeam(myClub),ai:newTeam(aiClub)}};
+  closeOv();
+  aiSetup();
+  log(`${CLUBS[myClub].name} x ${CLUBS[aiClub].name}. Monte sua escalação: toque nos jogadores da sua mão.`,"big");
+  if(T_("me").mull)log(`Sua primeira mão veio sem jogadores, então embaralhei de novo (${T_("me").mull}x).`);
+  render();
+}
+function beginMatch(){
+  G.phase="play";log("Apita o árbitro! Começa o jogo e você sai jogando.","big");
+  startTurn("me",true);
+}
+
+/* ================== REGRAS ================== */
+const minute=()=>Math.min(90,Math.round((G.half+1)*4.5));
+const T_=s=>G.t[s];
+const nm=s=>CLUBS[T_(s).club].name;
+const coachOn=s=>!T_(s).coachFired;
+const front=s=>T_(s).F.filter(Boolean);
+const back=s=>T_(s).B.filter(Boolean);
+const fieldOf=s=>[...front(s),...back(s)];
+function slotOf(s,p){const T=T_(s);let i=T.F.indexOf(p);if(i>=0)return ["F",i];i=T.B.indexOf(p);if(i>=0)return ["B",i];return null;}
+const inFront=(s,p)=>T_(s).F.includes(p);
+function effCost(move){const c=[...move.cost];if(G&&G.stadium&&G.stadium.def.key==="chuva"&&c.includes("V"))c.push("C");return c;}
+function missing(p,move){
+  if(p.free)return [];
+  const pool=[...p.en.map(e=>e.def.type)],cost=effCost(move),need=[];
+  for(const t of cost.filter(x=>x!=="C")){const i=pool.indexOf(t);if(i<0)need.push(t);else pool.splice(i,1);}
+  const cn=cost.filter(x=>x==="C").length-pool.length;for(let i=0;i<cn;i++)need.push("C");
+  return need;
+}
+const payable=(p,m)=>missing(p,m).length===0;
+/* poderes dos suportes que estão atrás */
+const supsOf=(s,k)=>back(s).filter(x=>x.def.sup&&x.def.sup.k===k);
+const shieldOf=s=>10*supsOf(s,"guard").length;
+const isStar=d=>d.stage==="Ídolo"||!!d.from;
+function pay(p,move){
+  if(p.free){p.free=false;return true;}
+  for(const t of effCost(move)){const i=t==="C"?0:p.en.findIndex(e=>e.def.type===t);if(i>=0&&p.en.length)p.en.splice(i,1);}
+  return false;
+}
+function giveEnergy(s,t,target,why){
+  target.en.push({def:{kind:"energy",type:t,name:EN[t]}});
+  log(why||`⚡ ${nm(s)} dá energia de ${EN[t]} pra ${target.def.name}.`,s);
+}
+/* pra quem vai a energia: primeiro quem ainda não consegue atacar (carry antes), depois o carry com menos energia */
+function energyTarget(s,t){
+  const f=front(s);if(!f.length)return null;
+  const need=p=>p.def.moves.some(m=>missing(p,m).length)&&!p.def.moves.some(m=>missing(p,m).length===0);
+  const fits=p=>p.def.moves.some(m=>m.cost.includes(t)||m.cost.includes("C"));
+  const rank=p=>(need(p)?0:10)+(fits(p)?0:5)+(p.def.role==="C"?0:p.def.role==="S"?1:2)+p.en.length*.1;
+  return [...f].sort((a,b)=>rank(a)-rank(b))[0];
+}
+function bonusOf(s,p,move){
+  if(move.kind!=="dmg")return 0;
+  let b=p.buff||0;const T=T_(s);
+  b+=10*supsOf(s,"bonus").length;
+  if(T.escanteio)b+=20+(move.esc||0);
+  if(G.stadium&&G.stadium.def.key==="caldeirao"&&G.stadium.owner===s)b+=10;
+  if(T.club==="fla"&&coachOn(s)&&p.def.stage==="Ídolo")b+=10;
+  return b;
+}
+/* Quem ataca: só quem está na frente bate; quem está atrás só usa bônus e cura.
+   Quem apanha: só a frente do rival. Tanque na frente protege os outros da frente.
+   Frente do rival vazia: carry da frente chuta ao gol. */
+function targets(s,p,move){
+  const o=other(s);
+  if(move.kind==="buff")return fieldOf(s).filter(x=>x.def.role==="C");
+  if(move.kind==="heal")return fieldOf(s).filter(x=>x.dmg>0);
+  if(!inFront(s,p))return [];
+  const f=front(o);
+  if(!f.length)return p.def.role==="C"?["GOAL",...(mechOf(s)==="banco"?back(o):[])]:[];
+  const tanks=f.filter(x=>x.def.role==="T");
+  const snipe=mechOf(s)==="banco"&&p.def.role==="C"?back(o):[];
+  return [...(tanks.length?tanks:f),...snipe];
+}
+const canAct=(s,p,m)=>!!slotOf(s,p)&&!p.para&&payable(p,m)&&targets(s,p,m).length>0;
+const whyNot=(s,p,m)=>{
+  if(!slotOf(s,p))return "Precisa estar em campo.";
+  if(p.para)return "Está paralisado neste turno.";
+  if(m.kind==="dmg"&&!inFront(s,p))return "Só ataca quem está na frente.";
+  const mi=missing(p,m);if(mi.length)return `Falta energia: ${mi.map(x=>EN[x]).join(", ")}.`;
+  if(!targets(s,p,m).length)return m.kind==="dmg"?"A frente do rival está vazia, e só carry chuta ao gol.":"Ninguém pra receber isso agora.";
+  return "";
+};
+
+async function startTurn(side,first){
+  G.active=side;G.busy=false;G.sheet=null;const T=T_(side);
+  if(!first){draw(T);if(mechOf(side)==="busca"){draw(T);log(`🔎 ${nm(side)} usa a Busca e compra 1 carta a mais.`,side);}}
+  for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`🧪 ${p.def.name} está envenenado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp)knockOut(side,p);}
+  if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
+  for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
+  T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
+  if(G.half===10)log("⏱️ Intervalo! Começa o segundo tempo.","big");
+  render();
+  if(side==="ai"){await sleep(700*SPEED());await aiTurn();}
+}
+function fillFront(s){
+  const T=T_(s);
+  if(front(s).length||!back(s).length)return;
+  const p=[...back(s)].sort((a,b)=>(b.def.role==="T")-(a.def.role==="T"))[0];
+  T.B[T.B.indexOf(p)]=null;T.F[T.F.indexOf(null)]=p;
+  log(`A frente de ${nm(s)} estava vazia: ${p.def.name} foi obrigado a subir.`,s);
+}
+async function endTurn(){
+  if(G.over)return;
+  fillFront(G.active);
+  for(const p of fieldOf(G.active))p.para=false;
+  G.sheet=null;G.half++;G.busy=true;
+  if(G.half>=20){render();return finishMatch();}
+  await startTurn(other(G.active));
+}
+function phoneEl(){return document.querySelector(".phone")||document.body;}
+async function flip(side,label){
+  const r=Math.random()<.5;
+  const el=document.createElement("div");el.className="coin spin";el.textContent="…";phoneEl().appendChild(el);
+  await sleep(600*SPEED());el.textContent=r?"Cara":"Coroa";el.classList.remove("spin");
+  await sleep(650*SPEED());el.remove();
+  log(`🪙 ${label}: ${r?"CARA":"COROA"}`,side);
+  return r;
+}
+async function toast(txt,ms=1200){const el=document.createElement("div");el.className="toast";el.textContent=txt;phoneEl().appendChild(el);await sleep(ms*SPEED());el.remove();}
+
+async function act(side,p,move,target,dbl){
+  if(G.over)return;
+  G.busy=true;G.sheet=null;render();
+  const T=T_(side),o=other(side);T.attacked=true;
+  if(move.kind==="dmg"&&pay(p,move))log(`⭐ ${p.def.name} usa o ataque grátis e não gasta energia.`,side);
+  if(move.kind==="buff"){target.buff+=move.buff;log(`${p.def.name} usa "${move.n}": ${target.def.name} ganha +${move.buff} no próximo ataque.`,side);}
+  else if(move.kind==="heal"){target.dmg=Math.max(0,target.dmg-move.heal);log(`${p.def.name} usa "${move.n}": ${target.def.name} recupera ${move.heal} de vida.`,side);}
+  else{
+    let power=move.p+bonusOf(side,p,move);
+    if(move.coin){
+      let ok=await flip(side,`Moeda de ${p.def.name}`);
+      if(!ok&&T.club==="pal"&&coachOn(side)&&!T.rerollUsed){T.rerollUsed=true;log("Abel Ferreira pede calma: joga a moeda de novo!",side);ok=await flip(side,"Moeda de novo");}
+      if(ok)power+=move.coin;
+    }
+    p.buff=0;
+    if(dbl&&mechOf(side)==="vstar"&&!T.vstarUsed){T.vstarUsed=true;power*=2;log(`🌟 ${CLUBS[T.club].coach.power}! O ataque vale o dobro.`,side);await toast("VSTAR!",900);}
+    if(target==="GOAL"){log(`${p.def.name} chuta com força ${power}, sem ninguém na frente!`,side);await goal(side);}
+    else{
+      let dealt=Math.max(0,power-(target.def.guard||0)-shieldOf(o));
+      const wasFront=inFront(o,target);
+      log(`${p.def.name} usa "${move.n}" em ${target.def.name}: tira ${dealt} de vida.`,side);
+      if(target.dmg+dealt>=target.def.hp&&await useReaction(o,"caicai",`${target.def.name} vai ficar sem vida e sair. Usar Cai-cai?`)){
+        if(await flip(o,"Cai-cai")){dealt=0;log("🤕 O juiz caiu no cai-cai! Falta, e o ataque não conta.",o);}
+        else log("O juiz mandou seguir. Não colou!",o);
+      }
+      target.dmg+=dealt;
+      if(target.dmg>=target.def.hp){
+        knockOut(o,target);
+        if(p.def.role==="C"&&wasFront){log(`${p.def.name} passou por ${target.def.name} e ficou cara a cara com o goleiro!`,side);await goal(side);}
+        else if(!front(o).length)log(`A frente de ${nm(o)} ficou vazia!`,side);
+      }else if(dealt>0){
+        if(mechOf(side)==="veneno"&&!target.poison&&wasFront){target.poison=true;log(`🧪 ${target.def.name} ficou envenenado!`,side);}
+        if(mechOf(side)==="paralisia"&&await flip(side,"Paralisia")){target.para=true;log(`⚡ ${target.def.name} ficou paralisado e não ataca no próximo turno!`,side);}
+      }
+    }
+  }
+  T.escanteio=false;
+  render();await sleep(500*SPEED());
+  await endTurn();
+}
+async function goal(side){
+  await toast("GOOOL!");
+  if(await useReaction(other(side),"var",`${nm(side)} fez gol. Chamar o VAR?`)){
+    if(await flip(other(side),"VAR")){log("📺 VAR anulou o gol!","big");await toast("Anulado!",900);return;}
+    log("📺 VAR confirmou: é gol!",other(side));
+  }
+  T_(side).score++;log(`⚽ GOL de ${nm(side)}! ${score()}`,"big");
+}
+const score=()=>`${nm("me")} ${T_("me").score} x ${T_("ai").score} ${nm("ai")}`;
+function knockOut(side,p){
+  const T=T_(side),[l,i]=slotOf(side,p);
+  T.discard.push(p);p.en=[];p.free=false;p.poison=false;p.para=false;T[l][i]=null;
+  log(`🚑 ${p.def.name} ficou sem vida e saiu de campo.`,side);
+}
+async function useReaction(side,key,question){
+  const T=T_(side),c=T.hand.find(x=>x.def.key===key);if(!c)return false;
+  const yes=side==="ai"?Math.random()<.8:await ask(EV[key].name,question,c);
+  if(yes){T.hand.splice(T.hand.indexOf(c),1);T.discard.push(c);log(`${nm(side)} usa ${c.def.name}!`,side);render();}
+  return yes;
+}
+
+/* ---- ações ---- */
+function place(s,c,line){
+  const T=T_(s),i=T[line].indexOf(null);if(i<0)return false;
+  T.hand.splice(T.hand.indexOf(c),1);c.turnIn=G.half;c.free=isStar(c.def);T[line][i]=c;
+  log(`${c.def.name} entra ${line==="F"?"na frente":"atrás"}.`,s);return true;
+}
+const evoTargets=(s,c)=>fieldOf(s).filter(p=>p.def.key===c.def.from&&p.turnIn!==G.half);
+function evolve(s,c,target){
+  const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);
+  const old=target.def;target.def=c.def;target.turnIn=G.half;target.free=true;c.def=old;T.discard.push(c);
+  log(`✨ ${old.name} evoluiu: agora é ${target.def.stage}!`,s);
+}
+function attach(s,c,target){const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);target.en.push(c);T.energyLeft--;log(`Energia de ${c.def.name} em ${target.def.name}.`,s);}
+/* troca de linha: 1 por turno. "with" pode ser outro jogador (troca) ou null (vai pra vaga vazia da outra linha) */
+function switchLine(s,p,withP){
+  const T=T_(s),[l,i]=slotOf(s,p),ol=l==="F"?"B":"F";
+  if(withP){const [l2,j]=slotOf(s,withP);T[l][i]=withP;T[l2][j]=p;log(`🔁 ${p.def.name} e ${withP.def.name} trocam de lugar.`,s);}
+  else{const j=T[ol].indexOf(null);T[l][i]=null;T[ol][j]=p;log(`🔁 ${p.def.name} vai ${ol==="F"?"pra frente":"pra trás"}.`,s);}
+  T.swLeft--;T.switched=T.swLeft<=0;
+  if(T.B.includes(p))p.poison=false;
+  if(withP&&T.B.includes(withP))withP.poison=false;
+}
+function canPlayEvent(s,c){
+  const T=T_(s),O=T_(other(s)),k=c.def.key;
+  if(k==="mandrake")return front(other(s)).filter(x=>x.def.role==="T").length<=1&&!T.attacked;
+  if(k==="diretoria")return O.score<T.score&&!O.coachFired;
+  if(k==="massagem")return fieldOf(s).some(p=>p.dmg>0);
+  return true;
+}
+async function playEvent(s,c,target){
+  const T=T_(s),O=T_(other(s)),k=c.def.key;
+  T.hand.splice(T.hand.indexOf(c),1);
+  if(c.def.kind==="stadium"){
+    if(G.stadium)T_(G.stadium.owner).discard.push(G.stadium.card);
+    G.stadium={card:c,def:c.def,owner:s};log(`🏟️ ${c.def.name} agora vale pros dois times.`,s);render();return;
+  }
+  T.discard.push(c);log(`${nm(s)} joga ${c.def.name}.`,s);
+  if(k==="massagem"){target.dmg=Math.max(0,target.dmg-40);log(`${target.def.name} recuperou 40 de vida.`,s);}
+  if(k==="escanteio")T.escanteio=true;
+  if(k==="lancamento"){T.energyLeft++;log("Pode dar mais 1 energia neste turno.",s);}
+  if(k==="diretoria"){O.coachFired=true;log(`📉 ${CLUBS[O.club].coach.name} foi demitido! Entra um interino sem poder.`,"big");}
+  render();
+  if(k==="mandrake"){
+    G.busy=true;T.attacked=true;render();
+    if(await flip(s,"Pênalti mandrake")){log("O juiz deu o pênalti!",s);await goal(s);}else log("O juiz mandou seguir.",s);
+    render();await sleep(400*SPEED());await endTurn();
+  }
+}
+
+/* ================== COMPUTADOR ================== */
+function aiPlace(s){
+  const T=T_(s);let n=0;
+  for(const c of [...T.hand].filter(isBasic).sort((a,b)=>"TCS".indexOf(a.def.role)-"TCS".indexOf(b.def.role))){
+    const r=c.def.role,wantFront=r!=="S";
+    if(wantFront&&place(s,c,"F")){n++;continue;}
+    if(place(s,c,"B")){n++;continue;}
+    if(!front(s).length&&place(s,c,"F"))n++;
+  }
+  return n;
+}
+function aiSetup(){aiPlace("ai");fillFront("ai");}
+function bestAction(s){
+  let best=null,bs=0;const o=other(s);
+  for(const p of fieldOf(s))for(const m of p.def.moves){
+    if(!payable(p,m)||p.para)continue;
+    for(const t of targets(s,p,m)){
+      let sc=0;
+      if(m.kind==="buff")sc=t.buff?2:20+m.buff/5;
+      else if(m.kind==="heal")sc=Math.min(m.heal,t.dmg)*0.6;
+      else{
+        const exp=m.p+bonusOf(s,p,m)+m.coin*.5;
+        if(t==="GOAL")sc=1000;
+        else{const left=t.def.hp-t.dmg,dealt=exp-(t.def.guard||0),ko=dealt>=left;
+          sc=Math.min(dealt,left)+(ko?80:0)+(ko&&p.def.role==="C"&&inFront(o,t)?900:0);}
+      }
+      if(sc>bs){bs=sc;best={p,m,t};}
+    }
+  }
+  return best;
+}
+function aiGive(s){
+  const T=T_(s),f=front(s);if(!f.length||T.energyLeft<=0)return false;
+  const main=CLUBS[T.club].main||"T";
+  let best=null,bs=-1;
+  for(const p of f)for(const t of ["T","V"]){
+    const need=p.def.moves.some(m=>missing(p,m).length)&&!p.def.moves.some(m=>missing(p,m).length===0);
+    const fits=p.def.moves.some(m=>m.cost.includes(t));
+    const sc=(need?50:0)+(fits?20:(p.def.moves.some(m=>m.cost.includes("C"))&&t===main?15:0))+(p.def.role==="C"?10:p.def.role==="S"?4:0)-p.en.length*3;
+    if(sc>bs){bs=sc;best={p,t};}
+  }
+  giveEnergy(s,best.t,best.p);T.energyLeft--;return true;
+}
+async function aiTurn(){
+  const s="ai",T=T_(s),wait=()=>sleep(650*SPEED());
+  if(aiPlace(s)){render();await wait();}
+  for(const c of [...T.hand]){if(c.def.kind==="player"&&c.def.from){const t=evoTargets(s,c);if(t.length){evolve(s,c,t[0]);render();await wait();}}}
+  // troca de linha: tira da frente quem está quase caindo, ou sobe um carry de trás
+  const weak=front(s).filter(p=>(p.def.hp-p.dmg)<p.def.hp*.3).sort((a,b)=>(a.def.hp-a.dmg)-(b.def.hp-b.dmg))[0];
+  const bc=back(s).filter(p=>p.def.role!=="S").sort((a,b)=>(b.def.hp-b.dmg)-(a.def.hp-a.dmg))[0];
+  if(weak&&(bc||T.B.includes(null))){switchLine(s,weak,bc||null);render();await wait();}
+  else if(bc&&T.F.includes(null)){switchLine(s,bc,null);render();await wait();}
+  const mas=T.hand.find(c=>c.def.key==="massagem");
+  if(mas){const hurt=fieldOf(s).filter(p=>p.dmg>=40).sort((a,b)=>b.dmg-a.dmg)[0];if(hurt){await playEvent(s,mas,hurt);await wait();}}
+  const st=T.hand.find(c=>c.def.kind==="stadium");
+  if(st&&(!G.stadium||G.stadium.owner!==s)){await playEvent(s,st);await wait();}
+  const dir=T.hand.find(c=>c.def.key==="diretoria");
+  if(dir&&canPlayEvent(s,dir)){await playEvent(s,dir);await wait();}
+  const lan=T.hand.find(c=>c.def.key==="lancamento");
+  if(lan&&front(s).length>1){await playEvent(s,lan);await wait();}
+  while(T.energyLeft>0&&aiGive(s)){render();await wait();}
+  const man=T.hand.find(c=>c.def.key==="mandrake");
+  let a=bestAction(s);
+  if(man&&canPlayEvent(s,man)&&(!a||a.t!=="GOAL")){await playEvent(s,man);return;}
+  if(a){
+    const esc=T.hand.find(c=>c.def.key==="escanteio");
+    if(esc&&a.m.kind==="dmg"){await playEvent(s,esc);await wait();a=bestAction(s)||a;}
+    let dbl=false;
+    if(mechOf(s)==="vstar"&&!T.vstarUsed&&a.t!=="GOAL"){const left=a.t.def.hp-a.t.dmg,pw=a.m.p+bonusOf(s,a.p,a.m);dbl=(pw<left&&pw*2>=left)||G.half>=16;}
+    await act(s,a.p,a.m,a.t,dbl);return;
+  }
+  log(`${nm(s)} toca a bola de lado e passa a vez.`,s);
+  await wait();await endTurn();
+}
+
+/* ================== FIM DE JOGO ================== */
+async function finishMatch(){
+  G.over=true;log("Fim de jogo! "+score(),"big");render();
+  let pens=null;
+  if(T_("me").score===T_("ai").score){
+    await toast("Pênaltis!",1100);
+    pens={me:0,ai:0,seq:[]};
+    for(let r=0;r<30;r++){
+      for(const s of ["me","ai"]){const g=Math.random()<.72;pens[s]+=g?1:0;pens.seq.push(`${nm(s)} ${g?"⚽":"❌"}`);}
+      if(r<4){const left=4-r;if(pens.me>pens.ai+left||pens.ai>pens.me+left)break;}
+      else if(pens.me!==pens.ai)break;
+    }
+    log(`Pênaltis: ${nm("me")} ${pens.me} x ${pens.ai} ${nm("ai")}`,"big");
+  }
+  const me=T_("me").score+(pens?pens.me/100:0),ai=T_("ai").score+(pens?pens.ai/100:0);
+  showOv(`<div class="dlg"><h2>${me>ai?"Vitória!":"Derrota"}</h2>
+    <p style="font-size:18px;color:var(--fg)">${score()}</p>
+    ${pens?`<p>Nos pênaltis: ${pens.me} x ${pens.ai}</p><p style="font-size:12px">${pens.seq.join(" · ")}</p>`:""}
+    <div class="row"><button class="btn p" data-act="newgame">Jogar de novo</button><button class="btn s" data-act="close">Ver o campo</button></div></div>`);
+}
+
+/* ================== TELA ================== */
+function log(t,cls){G.log.unshift({t,cls:cls||""});if(G.log.length>400)G.log.pop();}
+const eDot=t=>`<i class="e ${t}" title="${EN[t]}">${t==="C"?"★":t}</i>`;
+function mvLine(m){
+  const val=m.kind==="buff"?`+${m.buff}`:m.kind==="heal"?`♥${m.heal}`:m.p;
+  return `<div><span style="display:flex;gap:1px">${effCost(m).map(eDot).join("")}</span><span>${m.n}${m.coin?` <em>🪙+${m.coin}</em>`:""}</span><strong>${val}</strong></div>`;
+}
+/* carta grande, usada na gaveta */
+function bigCard(c){
+  const d=c.def;
+  if(d.kind==="player")return `<div class="cm f-${frameOf(d)}"><div class="in"><div class="hd"><span class="st ${d.stage}">${d.stage==="Cria"?"Cria da base":d.stage}${d.from?" ↑":""}</span><span class="fo">❤️${d.hp-c.dmg}/${d.hp}</span></div>
+      <div class="nm">${d.name}</div><div class="art">${chibi(d)}</div>
+      <div class="ps role-${d.role}"><span>${ROLEIC[d.role]} ${ROLENAME[d.role]}</span><span>${d.guard?`-${d.guard} dano · `:""}#${d.num}</span></div>
+      <div class="mv">${d.moves.map(mvLine).join("")}${d.sup?`<div style="grid-template-columns:1fr;font-weight:600;color:#5B3FA0">${({gen:"⚡ Gera "+(d.sup.t||""),guard:"🧱 Protege -10",bonus:"📣 +10 na frente"})[d.sup.k]} (atrás)</div>`:""}</div>
+      <div class="en">${c.free?`<span class="bf">⭐ grátis</span>`:""}${(c.en||[]).map(e=>eDot(e.def.type)).join("")}${c.buff?`<span class="bf">+${c.buff}</span>`:""}</div></div></div>`;
+  if(d.kind==="energy")return `<div class="cm energy"><div class="in"><span class="tp">Energia</span><i class="e big ${d.type}">${d.type}</i><div class="nm">${d.name}</div></div></div>`;
+  const tp={event:"Evento",stadium:"Estádio",reaction:"Resposta"}[d.kind];
+  return `<div class="cm ${d.kind}"><div class="in"><span class="tp">${tp}</span><div class="nm" style="white-space:normal">${d.name}</div><div class="ic">${d.ic}</div><div class="tx">${d.tx}</div></div></div>`;
+}
+/* carta compacta do campo */
+function fieldCard(s,p){
+  const d=p.def,mine=s==="me",ready=mine&&myTurn()&&!T_("me").attacked&&d.moves.some(m=>canAct("me",p,m));
+  const pct=Math.max(0,(d.hp-p.dmg)/d.hp*100);
+  return `<button type="button" class="fc f-${frameOf(d)} ${ready?"ready":""} ${G.sheet&&G.sheet.uid===p.uid?"sel":""}" data-act="card" data-uid="${p.uid}" aria-label="${d.name}, ${ROLENAME[d.role]}, vida ${d.hp-p.dmg}">
+    <div class="in"><div class="hd"><span class="nm">${d.name}</span><span class="fo">❤️${d.hp-p.dmg}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="art">${chibi(d)}</div>
+    <div class="ft"><span class="ro">${ROLEIC[d.role]}</span>${p.poison?"🧪":""}${p.para?"⚡":""}${p.free?`<span class="bf" title="Ataque grátis">⭐</span>`:""}${p.en.map(e=>eDot(e.def.type)).join("")}${p.buff?`<span class="bf">+${p.buff}</span>`:""}</div></div></button>`;
+}
+function lineHTML(s,l){
+  const T=T_(s),cls=l==="F"?"front":"back";
+  return `<div class="ln ${cls}">${T[l].map(p=>p?fieldCard(s,p):`<div class="slot">${l==="F"?"Frente":"Trás"}<br>vaga</div>`).join("")}</div>`;
+}
+function handCard(c){
+  const d=c.def,dim=!myTurn()&&G.phase!=="setup";
+  if(d.kind==="player")return `<button type="button" class="hc player f-${frameOf(d)} ${dim?"dim":""}" data-act="card" data-uid="${c.uid}"><span class="k">${ROLEIC[d.role]} ${ROLENAME[d.role]}${d.from?" ↑":""}</span><div class="mini">${chibi(d)}</div><span class="nm">${d.name}</span></button>`;
+  if(d.kind==="energy")return `<button type="button" class="hc energy ${dim?"dim":""}" data-act="card" data-uid="${c.uid}"><span class="k">Energia</span><i class="e big ${d.type}">${d.type}</i><span class="nm">${d.name}</span></button>`;
+  return `<button type="button" class="hc ${d.kind} ${dim?"dim":""}" data-act="card" data-uid="${c.uid}"><span class="k">${({event:"Evento",stadium:"Estádio",reaction:"Resposta"})[d.kind]}</span><span class="ic">${d.ic}</span><span class="nm">${d.name}</span></button>`;
+}
+function findCard(uid){
+  uid=+uid;
+  for(const s of ["me","ai"]){const T=T_(s);for(const c of [...T.hand,...fieldOf(s),...T.discard])if(c.uid===uid)return c;}
+  if(G.stadium&&G.stadium.card.uid===uid)return G.stadium.card;return null;
+}
+const ownerOf=c=>fieldOf("me").includes(c)||T_("me").hand.includes(c)?"me":"ai";
+const myTurn=()=>G&&G.phase==="play"&&G.active==="me"&&!G.busy&&!G.over;
+function goalState(s){const f=front(s).length;return f?`<span class="gl closed">${f} na frente</span>`:`<span class="gl open">Gol aberto!</span>`;}
+function hint(){
+  if(G.phase==="setup")return "Escalação: toque num jogador da mão e escolha frente ou trás. Precisa de pelo menos 1 na frente.";
+  if(G.over)return "Fim de jogo.";
+  if(G.active!=="me")return "Vez do computador…";
+  if(T_("me").attacked)return "Você já atacou.";
+  return "Toque num jogador seu pra dar energia ou atacar. Brilho amarelo = pode atacar.";
+}
+function render(){
+  if(!G)return;
+  const me=T_("me"),ai=T_("ai");
+  const last=G.log[0]?G.log[0].t:"";
+  const pill=G.phase==="setup"?`<span class="turnPill setup">Escalação</span>`:G.over?"":`<span class="turnPill ${G.active}">${G.active==="me"?"Sua vez":"Vez do rival"}</span>`;
+  const endBtn=G.phase==="setup"
+    ?`<button class="end" data-act="begin" ${front("me").length?"":"disabled"}>Começar partida</button>`
+    :`<button class="end" data-act="end" ${myTurn()?"":"disabled"}>Encerrar turno</button>`;
+  ensureShell();
+  document.getElementById("screen").innerHTML=`
+    <div class="top">
+      <div class="sc"><i style="background:${CLUBS[me.club].c1}"></i><span class="t">${CLUBS[me.club].code}</span><span class="n">${me.score} x ${ai.score}</span><span class="t">${CLUBS[ai.club].code}</span><i style="background:${CLUBS[ai.club].c1}"></i></div>
+      <span class="ck">${G.phase==="setup"?"0'":minute()+"'"}</span>
+      <button class="ib" data-act="menu" aria-label="Menu">☰</button>
+    </div>
+    ${pill}
+    <div class="field">
+      <div class="side">
+        <div class="lineLbl"><b class="ai">${nm("ai")} · trás</b><span>Mão ${ai.hand.length} · Baralho ${ai.deck.length}</span></div>
+        ${lineHTML("ai","B")}
+        <div class="lineLbl"><span>frente</span></div>
+        ${lineHTML("ai","F")}
+      </div>
+      <button type="button" class="ticker" data-act="log">${goalState("ai")}<span class="lt">${last}</span></button>
+      <div class="side">
+        ${lineHTML("me","F")}
+        <div class="lineLbl"><b class="me">Você · frente ↑ trás ↓</b><span>${goalState("me").replace("Gol aberto!","Seu gol aberto!")}</span></div>
+        ${lineHTML("me","B")}
+      </div>
+    </div>
+    <div class="handBar"><div class="hl"><span>${hint()}</span></div><div class="hand">${me.hand.map(handCard).join("")}</div>
+      <div class="hl"><span>Baralho ${me.deck.length}</span><span>Energia pra dar: <b>${me.energyLeft}</b> · Troca de linha: <b>${me.switched?0:me.swLeft}</b></span></div></div>
+    <div class="actions"><button class="sec" data-act="log">Narração</button>${endBtn}</div>
+    ${G.sheet?sheetHTML():""}`;
+}
+function ensureShell(){
+  if(document.getElementById("screen"))return;
+  document.getElementById("app").innerHTML=`<div class="stage"><div class="phone"><div id="screen" style="display:contents"></div><div id="ovl"></div></div></div><p class="tag">Tela de celular simulada. No PC ela fica no meio; no celular ocupa a tela toda.</p>`;
+}
+
+/* ---- gaveta ---- */
+const AB=(act,label,small,extra,right,dis)=>`<button type="button" class="ab ${extra||""}" data-act="${act}" ${dis?"disabled":""}>${right&&right.left?right.left:"<span></span>"}<span><b>${label}</b>${small?`<small>${small}</small>`:""}</span><strong>${right&&right.val!==undefined?right.val:""}</strong></button>`;
+function sheetHTML(){
+  const sh=G.sheet,me=T_("me");let title="",body="",btns=[];
+  if(sh.kind==="log"){title="Narração";body=`<ul class="log">${G.log.map(l=>`<li class="${l.cls}">${l.t}</li>`).join("")}</ul>`;}
+  else if(sh.kind==="menu"){
+    title="Menu";
+    btns.push(`<button class="ab" data-act="rules"><span></span><span><b>Como jogar</b></span><strong></strong></button>`);
+    btns.push(`<button class="ab" data-act="fast"><span></span><span><b>${G.fast?"Computador em velocidade normal":"Acelerar o computador"}</b></span><strong></strong></button>`);
+    btns.push(`<button class="ab" data-act="info"><span></span><span><b>Técnicos e estádio</b></span><strong></strong></button>`);
+    btns.push(`<button class="ab" data-act="newgame"><span></span><span><b>Novo jogo</b><small>Volta pra escolha de time</small></span><strong></strong></button>`);
+  }
+  else if(sh.kind==="info"){
+    title="Técnicos e estádio";
+    const cl=s=>{const c=CLUBS[T_(s).club].coach;return `<p><b style="color:var(--gold)">${c.name}</b> (${nm(s)})${T_(s).coachFired?" foi demitido. Interino sem poder.":`: ${c.power}. ${c.text}`}</p>`;};
+    body=cl("me")+cl("ai")+`<p><b style="color:var(--fg)">Estádio:</b> ${G.stadium?`${G.stadium.def.ic} ${G.stadium.def.name} (de ${nm(G.stadium.owner)}). ${G.stadium.def.tx}`:"nenhum em jogo."}</p>`;
+  }
+  else if(sh.kind==="targets"){
+    const p=findCard(sh.att),m=p.def.moves[sh.mi];title=`${m.n}: escolha o alvo`;
+    targets("me",p,m).forEach((t,i)=>{
+      if(t==="GOAL")btns.push(AB(`tgt" data-i="${i}`,"⚽ Chutar ao gol!","A frente do rival está vazia.","pri"));
+      else btns.push(AB(`tgt" data-i="${i}`,t.def.name,`${inFront("ai",t)?"":"🎯 Atrás · "}${ROLENAME[t.def.role]} · ❤️ ${t.def.hp-t.dmg}${t.def.guard?` · recebe -${t.def.guard}`:""}`,"",{val:""}));
+    });
+  }
+  else{
+    const c=findCard(sh.uid);if(!c){G.sheet=null;return "";}
+    const d=c.def,owner=ownerOf(c),onField=!!slotOf(owner,c),inHand=me.hand.includes(c);
+    title=d.name;
+    const desc=d.kind==="player"?`${ROLEIC[d.role]} ${ROLENAME[d.role]}. ${({T:"Fica na frente pra proteger: enquanto houver tanque na frente, o rival só pode bater nele.",S:`Atrás ele usa o poder dele sozinho, todo turno: ${d.sup?d.sup.tx.replace("Atrás: ",""):""} Na frente ele ataca como os outros.`,C:"É quem faz gol: quando derruba alguém da frente do rival, é gol."})[d.role]}`:d.tx||"";
+    body=`<div class="row">${bigCard(c)}<p style="flex:1">${desc}${onField?`<br><br>Está ${inFront(owner,c)?"na <b>frente</b>":"<b>atrás</b>"}.`:""}</p></div>`;
+    const play=G.phase==="play",can=myTurn();
+    if(owner==="me"&&onField&&play){
+      d.moves.forEach((m,i)=>{
+        const ok=can&&!me.attacked&&canAct("me",c,m),b=bonusOf("me",c,m);
+        const what=m.kind==="dmg"?`${m.coin?`Moeda: CARA soma +${m.coin}. `:""}${m.tx||""}${b?`Bônus agora +${b}.`:""}`:m.tx;
+        btns.push(AB(`move" data-i="${i}`,m.n,`${what} ${ok?"":(me.attacked?"Você já atacou.":whyNot("me",c,m))}`,ok?"pri":"",{left:`<span style="display:flex;gap:2px">${effCost(m).map(eDot).join("")}</span>`,val:m.kind==="buff"?"+"+m.buff:m.kind==="heal"?"♥"+m.heal:m.p},!ok));
+      });
+      if(mechOf("me")==="vstar"&&!me.vstarUsed&&inFront("me",c))d.moves.forEach((m,i)=>{const ok=can&&!me.attacked&&canAct("me",c,m);
+        btns.push(AB(`move" data-i="${i}" data-dbl="1`,`🌟 ${m.n} em dobro`,`${CLUBS[me.club].coach.power}: só 1 vez no jogo.`,"",{left:"",val:m.p*2},!ok));});
+      if(c.poison)body+=`<p>🧪 <b>Envenenado:</b> perde 10 de vida no começo de cada turno seu enquanto estiver na frente. Mandar pra trás cura.</p>`;
+      if(c.para)body+=`<p>⚡ <b>Paralisado:</b> não ataca neste turno.</p>`;
+      if(can&&me.energyLeft>0)["T","V"].forEach(t=>btns.push(AB(`give" data-t="${t}`,`Dar energia de ${EN[t]}`,"Você ganha 1 energia por turno pra dar a quem quiser.","",{left:eDot(t)})));
+      if(c.free)body+=`<p>⭐ <b>Ataque grátis:</b> o próximo ataque dele não gasta energia (bônus de Ídolo e de quem evoluiu).</p>`;
+      if(can&&!me.switched){
+        const [l]=slotOf("me",c),ol=l==="F"?"B":"F";
+        if(me[ol].includes(null))btns.push(AB(`sw" data-w="0`,l==="F"?"⬇️ Mandar pra trás":"⬆️ Subir pra frente","Gasta a troca de linha do turno."));
+        me[ol].filter(Boolean).forEach(o=>btns.push(AB(`sw" data-w="${o.uid}`,`🔁 Trocar com ${o.def.name}`,`${o.def.name} vai ${l==="F"?"pra frente":"pra trás"}. Gasta a troca do turno.`)));
+      }
+    }
+    if(inHand){
+      const setup=G.phase==="setup",ok=setup||can;
+      if(isBasic(c)){
+        btns.push(AB(`put" data-l="F`,"⬆️ Colocar na frente","Pode atacar e apanhar.","pri",null,!ok||!me.F.includes(null)));
+        btns.push(AB(`put" data-l="B`,"⬇️ Colocar atrás",d.role==="S"?"Protegido, e usa o poder de suporte todo turno.":"Protegido, mas atrás não ataca.","",null,!ok||!me.B.includes(null)));
+      }else if(d.kind==="player"){
+        const ts=play?evoTargets("me",c):[];
+        if(!ts.length)body+=`<p>Pra evoluir, ${DEFS[d.from].name} (${DEFS[d.from].stage}) precisa estar em campo desde antes deste turno.</p>`;
+        ts.forEach(t=>btns.push(AB(`evo" data-w="${t.uid}`,`✨ Evoluir ${t.def.name}`,"Mantém a energia e o dano que já levou.","pri",null,!can)));
+      }else if(d.kind==="energy"){
+        if(setup)body+=`<p>Energia só pode ser ligada depois que a partida começar.</p>`;
+        else if(me.energyLeft<=0)body+=`<p>Você já ligou a energia deste turno.</p>`;
+        else fieldOf("me").forEach(p=>{const need=p.def.moves.map(m=>missing(p,m)).find(x=>x.length);btns.push(AB(`en" data-w="${p.uid}`,`Ligar em ${p.def.name}`,need?`Falta pra ${p.def.moves.find(m=>missing(p,m).length).n}: ${need.map(x=>EN[x]).join(", ")}`:"Já tem energia pra tudo.","",null,!can));});
+      }else if(d.kind==="reaction")body+=`<p>Essa carta é usada na vez do rival. Eu te pergunto na hora certa.</p>`;
+      else if(!setup){
+        if(d.key==="massagem")fieldOf("me").filter(p=>p.dmg>0).forEach(p=>btns.push(AB(`ev" data-w="${p.uid}`,`💆 Massagem em ${p.def.name}`,`❤️ ${p.def.hp-p.dmg}/${p.def.hp}`,"pri",null,!can)));
+        else btns.push(AB(`ev" data-w="0`,`Jogar ${d.name}`,canPlayEvent("me",c)?"":"Agora não dá: "+d.tx,"pri",null,!can||!canPlayEvent("me",c)));
+        if(d.key==="massagem"&&!fieldOf("me").some(p=>p.dmg>0))body+=`<p>Ninguém machucado agora.</p>`;
+      }
+    }
+  }
+  return `<div class="sheetWrap" data-act="shclose"><div class="sheet" data-stop="1"><div class="grab"></div><h3>${title}</h3>${body}${btns.length?`<div class="btns">${btns.join("")}</div>`:""}<button class="close" data-act="shclose">Fechar</button></div></div>`;
+}
+
+/* ================== CLIQUES ================== */
+document.addEventListener("click",async e=>{
+  const el=e.target.closest("[data-act]");
+  if(!el)return;
+  if(el.classList.contains("sheetWrap")&&e.target.closest("[data-stop]"))return;
+  const a=el.dataset.act;
+  if(a==="pick"){PICK=el.dataset.club;showPick(true);return;}
+  if(a==="rival"){const k=el.dataset.club==="rnd"?Object.keys(CLUBS).filter(x=>x!==PICK)[rnd(Object.keys(CLUBS).length-1)]:el.dataset.club;startGame(PICK,k);return;}
+  if(a==="lore"){showLore(el.dataset.club);return;}
+  if(a==="newgame"){PICK=null;showPick();return;}
+  if(a==="close"){closeOv();return;}
+  if(a==="back"){showPick(!!PICK);return;}
+  if(a==="rules"){showRules();return;}
+  if(a==="yes"||a==="no"){if(ASK){const r=ASK;ASK=null;closeOv();r(a==="yes");}return;}
+  if(!G)return;
+  const sh=G.sheet;
+  if(a==="shclose"){G.sheet=null;render();return;}
+  if(a==="menu"){G.sheet={kind:"menu"};render();return;}
+  if(a==="log"){G.sheet={kind:"log"};render();return;}
+  if(a==="info"){G.sheet={kind:"info"};render();return;}
+  if(a==="fast"){G.fast=!G.fast;G.sheet=null;render();return;}
+  if(a==="card"){G.sheet={kind:"card",uid:+el.dataset.uid};render();return;}
+  if(a==="begin"){if(front("me").length){G.sheet=null;beginMatch();}return;}
+  const me=T_("me");
+  if(a==="put"){const c=findCard(sh.uid);if((G.phase==="setup"||myTurn())&&place("me",c,el.dataset.l)){G.sheet=null;render();}return;}
+  if(!myTurn())return;
+  if(a==="end"){G.busy=true;G.sheet=null;log("Você passa a vez.","me");await endTurn();return;}
+  const c=sh&&sh.uid?findCard(sh.uid):null,w=el.dataset.w?findCard(el.dataset.w):null;
+  if(a==="move"){const m=c.def.moves[+el.dataset.i],dbl=!!el.dataset.dbl;if(!canAct("me",c,m)||me.attacked)return;const ts=targets("me",c,m);
+    if(ts.length===1){await act("me",c,m,ts[0],dbl);return;}G.sheet={kind:"targets",att:c.uid,mi:+el.dataset.i,dbl};render();return;}
+  if(a==="tgt"){const p=findCard(sh.att),m=p.def.moves[sh.mi],t=targets("me",p,m)[+el.dataset.i];if(t)await act("me",p,m,t,sh.dbl);return;}
+  if(a==="sw"){if(!me.switched){switchLine("me",c,w);G.sheet=null;render();}return;}
+  if(a==="evo"){evolve("me",c,w);G.sheet=null;render();return;}
+  if(a==="give"){if(me.energyLeft>0&&c&&slotOf("me",c)){giveEnergy("me",el.dataset.t,c);me.energyLeft--;G.sheet=null;render();}return;}
+  if(a==="en"){if(me.energyLeft>0){attach("me",c,w);G.sheet=null;render();}return;}
+  if(a==="ev"){G.sheet=null;await playEvent("me",c,w);render();return;}
+});
+
+/* ================== JANELAS ================== */
+let ASK=null;
+function ovl(){return document.getElementById("ovl");}
+function showOv(html){const o=ovl();if(o)o.innerHTML=`<div class="ov">${html}</div>`;}
+function closeOv(){const o=ovl();if(o)o.innerHTML="";if(!G)showPick();}
+function ask(title,q,card){return new Promise(r=>{ASK=r;showOv(`<div class="dlg"><h2>${title}</h2><p>${q}</p><div style="display:flex;justify-content:center;margin:10px 0">${bigCard(card)}</div><div class="row"><button class="btn p" data-act="yes">Usar agora</button><button class="btn s" data-act="no">Guardar</button></div></div>`);});}
+function rulesHTML(){return `
+  <h2>Como jogar</h2>
+  <ol>
+    <li><b>Objetivo:</b> mais gols em 90 minutos (10 turnos pra cada). Empatou, pênaltis.</li>
+    <li><b>Começo:</b> você compra 7 cartas e escala quem quiser. Pelo menos 1 na frente.</li>
+    <li><b>Duas linhas:</b> 3 vagas na <b>frente</b> e 2 <b>atrás</b>. Só a frente ataca e apanha. Quem está atrás fica protegido. Suporte atrás usa o poder dele sozinho todo turno: ⚡ gera energia, 🧱 protege (-10 de dano na sua frente) ou 📣 dá +10 de dano na sua frente.</li>
+    <li><b>Papéis:</b> ${ROLEIC.T} tanque protege (com tanque na frente, o rival só bate nele), ${ROLEIC.S} suporte ajuda, ${ROLEIC.C} carry faz gol.</li>
+    <li><b>Vida ❤️:</b> cada ataque tira vida. Chegou a zero, o jogador sai de campo. A Massagem devolve vida.</li>
+    <li><b>Gol:</b> quando um carry derruba um jogador da frente do rival, é gol na hora. E se a frente do rival estiver vazia, o carry da frente chuta direto.</li>
+    <li><b>Seu turno:</b> compre 1, coloque jogadores, evolua, faça <b>1 troca de linha</b>, dê <b>1 energia</b> pra quem quiser e use eventos. No fim, <b>1 ataque</b> (encerra o turno).</li>
+    <li><b>Frente vazia no fim do turno:</b> alguém de trás é obrigado a subir.</li>
+    <li><b>Energia:</b> não vem na mão. Todo turno você ganha 1 pra dar, e os suportes de trás geram mais. Fica grudada no jogador, e <b>cada ataque gasta 1</b>. ${eDot("T")} Técnica, ${eDot("V")} Velocidade, ${eDot("C")} qualquer uma.</li>
+    <li><b>⭐ Ataque grátis:</b> Ídolos e quem acabou de evoluir têm 1 ataque que não gasta energia.</li>
+    <li><b>Moeda 🪙:</b> CARA soma o bônus. <b>Evolução ↑:</b> vai em cima da versão anterior do mesmo jogador.</li>
+    <li><b>Respostas</b> (Cai-cai, VAR) são usadas na vez do rival. Eu te pergunto na hora.</li>
+  </ol>
+  <p>Cada clube tem a sua mecânica. Na escolha de time, toque no ℹ️ pra ler.</p>
+  <p style="font-size:12px">Rascunho de teste. Números são palpites pra equilibrar jogando. Elencos de outubro de 2026. Os 18 clubes novos estão todos como Titular por enquanto.</p>`;}
+function showRules(){showOv(`<div class="dlg">${rulesHTML()}<div class="row"><button class="btn p" data-act="close">Entendi</button></div></div>`);}
+let PICK=null;
+const ORDER=()=>Object.keys(CLUBS).sort((a,b)=>CLUBS[a].name.localeCompare(CLUBS[b].name,"pt"));
+function showPick(rival){
+  G=null;ASK=null;if(!rival)PICK=null;
+  ensureShell();document.getElementById("screen").innerHTML="";
+  const list=ORDER().filter(k=>k!==PICK);
+  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"Brasileirão TCG"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha seu time. Toque no ℹ️ pra ler a história e a mecânica do clube."}</p>
+  ${rival?`<div class="row" style="margin:8px 0"><button class="btn p" data-act="rival" data-club="rnd">🎲 Sortear rival</button><button class="btn s" data-act="newgame">Voltar</button></div>`:""}
+  <div class="clubs">${list.map(k=>`<div class="cl" style="--c1:${CLUBS[k].c1};--c2:${CLUBS[k].c2}"><button class="go" data-act="${rival?"rival":"pick"}" data-club="${k}"><i></i><b>${CLUBS[k].name}</b><small>${CLUBS[k].coach.power}</small></button><button class="inf" data-act="lore" data-club="${k}" aria-label="História do ${CLUBS[k].name}">ℹ️</button></div>`).join("")}</div>
+  ${rival?"":`<div class="row"><button class="btn s" data-act="rules">Como jogar</button></div>`}</div>`);
+}
+function showLore(k){
+  const c=CLUBS[k],lo=c.lore||{};
+  showOv(`<div class="dlg"><h2>${c.name}</h2>
+  ${lo.apelido?`<p><b style="color:var(--fg)">${lo.apelido}</b>${lo.mascote?` · mascote: ${lo.mascote}`:""}${lo.estadio?` · ${lo.estadio}`:""}</p>`:""}
+  ${lo.tradicoes?`<p>${lo.tradicoes}</p>`:""}
+  <p style="color:var(--fg)">${c.blurb}</p>
+  <p><b style="color:var(--gold)">${c.coach.name}</b>: ${c.coach.power}. ${c.coach.text}</p>
+  <div class="row"><button class="btn p" data-act="${PICK?"rival":"pick"}" data-club="${k}">Escolher ${c.name}</button><button class="btn s" data-act="back">Voltar</button></div></div>`);
+}
+showPick();
+</script>
+
+<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script>
+</body></html>
