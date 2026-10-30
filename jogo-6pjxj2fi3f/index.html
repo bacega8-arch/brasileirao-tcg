@@ -127,7 +127,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .cm .mv div{display:grid;grid-template-columns:auto 1fr auto;gap:3px;align-items:center;font-size:9.5px;font-weight:700;line-height:1.1}
 .cm .hb{font-size:9px;font-weight:800;color:#7A4A00;background:#FFF1A8;border-radius:6px;padding:1px 5px;margin:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .habx{background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:7px 10px;margin:6px 0;font-size:13px}.habx b{color:var(--gold)}
-.cm .mv strong{font-size:12px}.cm .mv em{font-style:normal;color:#B23A48}
+.cm{height:auto;min-height:208px}.cm .in{height:auto;min-height:100%}.cm .mv{flex:none}
+.cm .mv strong{font-size:12px}.cm .mv div.fx span:nth-child(2){color:#B23A48}.cm .mv em{font-style:normal;color:#B23A48}
 .cm .en{display:flex;gap:2px;padding:0 5px 3px;min-height:15px;flex-wrap:wrap}
 .cm.energy .in{align-items:center;justify-content:center;gap:6px;text-align:center}
 .cm.energy .big{width:70px;height:70px;font-size:30px;border-width:3px}
@@ -1240,6 +1241,13 @@ const CRAQUES=["cap-viveros","cap-zapelli","cam-bernard","cam-fred","bah-everton
 for(const k of CRAQUES){const d=DEFS[k];if(!d||d.stage==="Ídolo")continue;d.stage="Ídolo";d.hp+=20;d.moves.forEach(m=>{m.p+=10;});}
 /* craques mais roubados (Leonardo, 2026-10-30): tanque ganha +30 de vida; suporte e carry batem +20 */
 for(const d of Object.values(DEFS))if(d.kind==="player"&&d.stage==="Ídolo"){if(d.role==="T")d.hp+=30;else d.moves.forEach(m=>{if(m.kind==="dmg")m.p+=20;});}
+/* jogada forte (Leonardo, 2026-10-30): todo jogador tem um 2º ataque que precisa de 4 energias (qualquer tipo)
+   mas só gasta 2. Dano = 2x a jogada normal + 20, sem moeda. Craque ganha +20. */
+const FORTE={T:"Carrinho voador",S:"Lançamento de 40 metros",C:"Chute de placa"},FORTE_COST=4,FORTE_PAY=2;
+for(const d of Object.values(DEFS))if(d.kind==="player"){
+  const base=Math.max(0,...d.moves.filter(m=>m.kind==="dmg").map(m=>m.p))||20;
+  d.moves.push({n:FORTE[d.role],kind:"dmg",cost:Array(FORTE_COST).fill("C"),p:base*2+20+(d.stage==="Ídolo"?20:0),coin:0,forte:true,tx:`Jogada forte: precisa de ${FORTE_COST} energias, mas gasta só ${FORTE_PAY}.`});
+}
 
 /* ================== ARTE CARTOON ==================
    O desenho vem do módulo ArteCartoon (thread "Arte das cartas"), colado no começo da página.
@@ -1425,6 +1433,7 @@ const shieldOf=s=>10*supsOf(s,"guard").length;
 const isStar=d=>d.stage==="Ídolo"||!!d.from;
 function pay(p,move){
   if(p.free){p.free=false;return true;}
+  if(move.forte){p.en.splice(0,FORTE_PAY);return false;}
   for(const t of effCost(move)){const i=t==="C"?0:p.en.findIndex(e=>e.def.type===t);if(i>=0&&p.en.length)p.en.splice(i,1);}
   return false;
 }
@@ -1779,6 +1788,7 @@ function log(t,cls){G.log.unshift({t,cls:cls||""});if(G.log.length>400)G.log.pop
 const eDot=t=>`<i class="e ${t}" title="${EN[t]}">${t==="C"?"★":t}</i>`;
 function mvLine(m){
   const val=m.kind==="buff"?`+${m.buff}`:m.kind==="heal"?`♥${m.heal}`:m.p;
+  if(m.forte)return `<div class="fx"><span style="display:flex;gap:1px">${eDot("C")}<b style="font-size:9px">x${FORTE_COST}</b></span><span>💥 ${m.n}</span><strong>${val}</strong></div>`;
   return `<div><span style="display:flex;gap:1px">${effCost(m).map(eDot).join("")}</span><span>${m.n}${m.coin?` <em>🪙+${m.coin}</em>`:""}</span><strong>${val}</strong></div>`;
 }
 /* carta grande, usada na gaveta */
@@ -1999,6 +2009,7 @@ function rulesHTML(){return `
     <li><b>Vida ❤️:</b> cada ataque tira vida. Chegou a zero, o jogador sai de campo. A Massagem devolve vida.</li>
     <li><b>Gol:</b> <b>derrubou, é gol!</b> Qualquer jogador seu que derrubar um rival faz gol na hora. Se a frente do rival estiver vazia, quem está na sua frente chuta direto.</li>
     <li><b>Seu turno:</b> compre 1, coloque jogadores, evolua, faça <b>1 troca de linha</b>, dê <b>1 energia</b> pra quem quiser e use eventos. Depois, <b>cada jogador da frente pode atacar 1 vez</b>, se tiver energia (o ataque gasta a energia dele). Quando acabar, toque em <b>Encerrar turno</b>.</li>
+    <li><b>💥 Jogada forte:</b> todo jogador tem uma. Precisa de 4 energias de qualquer tipo, mas só gasta 2. Bate o dobro da jogada normal +20, sem moeda.</li>
     <li><b>Frente vazia no fim do turno:</b> alguém de trás é obrigado a subir.</li>
     <li><b>Energia:</b> não vem na mão. Todo turno você ganha 1 pra dar, e os suportes de trás geram mais. Fica grudada no jogador, e <b>cada ataque gasta 1</b>. ${eDot("T")} Técnica, ${eDot("V")} Velocidade, ${eDot("C")} qualquer uma.</li>
     <li><b>⭐ Ataque grátis:</b> Ídolos e quem acabou de evoluir têm 1 ataque que não gasta energia.</li>
