@@ -1107,7 +1107,7 @@ const MECH={
   vstar:{ic:"🌟",pk:"Lance de craque",tx:"Uma vez por jogo, um ataque seu tira o dobro de vida."},
   busca:{ic:"🔎",pk:"Olheiro",tx:"Você compra 1 carta a mais em todo turno."},
   recuo:{ic:"💨",pk:"Transição rápida",tx:"Você pode fazer 2 trocas de linha por turno em vez de 1."},
-  banco:{ic:"🎯",pk:"Chute de longe",tx:"Seus carries também podem atacar quem está atrás no rival (derrubar quem está atrás não é gol)."},
+  banco:{ic:"🎯",pk:"Chute de longe",tx:"Seus carries também podem atacar quem está atrás no rival (derrubou, também é gol)."},
   cura:{ic:"💚",pk:"Raça",tx:"No começo do seu turno, seu jogador da frente mais machucado recupera 20 de vida."}
 };
 const mechOf=s=>coachOn(s)?CLUBS[T_(s).club].mech:null;
@@ -1241,14 +1241,14 @@ function bonusOf(s,p,move){
 }
 /* Quem ataca: só quem está na frente bate; quem está atrás só usa bônus e cura.
    Quem apanha: só a frente do rival. Tanque na frente protege os outros da frente.
-   Frente do rival vazia: carry da frente chuta ao gol. */
+   Frente do rival vazia: quem está na frente chuta ao gol. Derrubou, é gol. */
 function targets(s,p,move){
   const o=other(s);
   if(move.kind==="buff")return fieldOf(s).filter(x=>x.def.role==="C");
   if(move.kind==="heal")return fieldOf(s).filter(x=>x.dmg>0);
   if(!inFront(s,p))return [];
   const f=front(o);
-  if(!f.length)return p.def.role==="C"?["GOAL",...(mechOf(s)==="banco"?back(o):[])]:[];
+  if(!f.length)return ["GOAL",...(mechOf(s)==="banco"&&p.def.role==="C"?back(o):[])];
   const tanks=f.filter(x=>x.def.role==="T");
   const snipe=mechOf(s)==="banco"&&p.def.role==="C"?back(o):[];
   return [...(tanks.length?tanks:f),...snipe];
@@ -1259,14 +1259,14 @@ const whyNot=(s,p,m)=>{
   if(p.para)return "Está marcado e não ataca neste turno.";
   if(m.kind==="dmg"&&!inFront(s,p))return "Só ataca quem está na frente.";
   const mi=missing(p,m);if(mi.length)return `Falta energia: ${mi.map(x=>EN[x]).join(", ")}.`;
-  if(!targets(s,p,m).length)return m.kind==="dmg"?"A frente do rival está vazia, e só carry chuta ao gol.":"Ninguém pra receber isso agora.";
+  if(!targets(s,p,m).length)return m.kind==="dmg"?"Não tem ninguém pra atacar agora.":"Ninguém pra receber isso agora.";
   return "";
 };
 
 async function startTurn(side,first){
   G.active=side;G.busy=false;G.sheet=null;const T=T_(side);
   if(!first){draw(T);if(mechOf(side)==="busca"){draw(T);log(`🔎 ${nm(side)} usa a Busca e compra 1 carta a mais.`,side);}}
-  for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`😤 ${p.def.name} está pressionado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp){knockOut(side,p);log(`Caiu pela pressão: não vale gol.`,side);}}
+  for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`😤 ${p.def.name} está pressionado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp){knockOut(side,p);log(`${p.def.name} não aguentou a pressão!`,other(side));await goal(other(side));}}
   if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
   for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
@@ -1337,9 +1337,8 @@ async function act(side,p,move,target,dbl){
       target.dmg+=dealt;
       if(target.dmg>=target.def.hp){
         knockOut(o,target);
-        if(p.def.role==="C"&&wasFront){log(`${p.def.name} passou por ${target.def.name} e ficou cara a cara com o goleiro!`,side);await goal(side);}
-        else{log(p.def.role!=="C"?`Derrubou ${target.def.name}, mas só ⚔️ carry faz gol.`:`Derrubou quem estava atrás: não vale gol.`,side);await toast("Sem gol",900);
-          if(!front(o).length)log(`A frente de ${nm(o)} ficou vazia!`,side);}
+        log(`${p.def.name} passou por ${target.def.name} e ficou cara a cara com o goleiro!`,side);await goal(side);
+        if(!front(o).length)log(`A frente de ${nm(o)} ficou vazia!`,side);
       }else if(dealt>0){
         if(mechOf(side)==="veneno"&&!target.poison&&wasFront){target.poison=true;log(`😤 ${target.def.name} ficou pressionado!`,side);}
         if(mechOf(side)==="paralisia"&&await flip(side,"Marcação")){target.para=true;log(`🔒 ${target.def.name} ficou marcado e não ataca no próximo turno!`,side);}
@@ -1449,7 +1448,7 @@ function bestAction(s){
         const exp=m.p+bonusOf(s,p,m)+m.coin*.5;
         if(t==="GOAL")sc=1000;
         else{const left=t.def.hp-t.dmg,dealt=exp-(t.def.guard||0),ko=dealt>=left;
-          sc=Math.min(dealt,left)+(ko?80:0)+(ko&&p.def.role==="C"&&inFront(o,t)?900:0);}
+          sc=Math.min(dealt,left)+(ko?80:0)+(ko?900:0);}
       }
       if(sc>bs){bs=sc;best={p,m,t};}
     }
@@ -1643,7 +1642,7 @@ function sheetHTML(){
     const c=findCard(sh.uid);if(!c){G.sheet=null;return "";}
     const d=c.def,owner=ownerOf(c),onField=!!slotOf(owner,c),inHand=me.hand.includes(c);
     title=d.name;
-    const desc=d.kind==="player"?`${ROLEIC[d.role]} ${ROLENAME[d.role]}. ${({T:"Fica na frente pra proteger: enquanto houver tanque na frente, o rival só pode bater nele.",S:`Atrás ele usa o poder dele sozinho, todo turno: ${d.sup?d.sup.tx.replace("Atrás: ",""):""} Na frente ele ataca como os outros.`,C:"É quem faz gol: quando derruba alguém da frente do rival, é gol."})[d.role]}`:d.tx||"";
+    const desc=d.kind==="player"?`${ROLEIC[d.role]} ${ROLENAME[d.role]}. ${({T:"Fica na frente pra proteger: enquanto houver tanque na frente, o rival só pode bater nele.",S:`Atrás ele usa o poder dele sozinho, todo turno: ${d.sup?d.sup.tx.replace("Atrás: ",""):""} Na frente ele ataca como os outros.`,C:"É quem bate mais forte. Derrubou alguém, é gol (vale pra qualquer jogador)."})[d.role]}`:d.tx||"";
     body=`<div class="row">${bigCard(c)}<p style="flex:1">${desc}${onField?`<br><br>Está ${inFront(owner,c)?"na <b>frente</b>":"<b>atrás</b>"}.`:""}</p></div>`;
     const play=G.phase==="play",can=myTurn();
     if(owner==="me"&&onField&&play){
@@ -1739,9 +1738,9 @@ function rulesHTML(){return `
     <li><b>Objetivo:</b> mais gols em 90 minutos (10 turnos pra cada). Empatou, pênaltis.</li>
     <li><b>Começo:</b> você compra 7 cartas e escala quem quiser. Pelo menos 1 na frente.</li>
     <li><b>Duas linhas:</b> 3 vagas na <b>frente</b> e 2 <b>atrás</b>. Só a frente ataca e apanha. Quem está atrás fica protegido. Suporte atrás usa o poder dele sozinho todo turno: ⚡ gera energia, 🧱 protege (-10 de dano na sua frente) ou 📣 dá +10 de dano na sua frente.</li>
-    <li><b>Papéis:</b> ${ROLEIC.T} tanque protege (com tanque na frente, o rival só bate nele), ${ROLEIC.S} suporte ajuda, ${ROLEIC.C} carry faz gol.</li>
+    <li><b>Papéis:</b> ${ROLEIC.T} tanque protege (com tanque na frente, o rival só bate nele), ${ROLEIC.S} suporte ajuda, ${ROLEIC.C} carry bate mais forte.</li>
     <li><b>Vida ❤️:</b> cada ataque tira vida. Chegou a zero, o jogador sai de campo. A Massagem devolve vida.</li>
-    <li><b>Gol:</b> quando um carry derruba um jogador da frente do rival, é gol na hora. E se a frente do rival estiver vazia, o carry da frente chuta direto.</li>
+    <li><b>Gol:</b> <b>derrubou, é gol!</b> Qualquer jogador seu que derrubar um rival faz gol na hora. Se a frente do rival estiver vazia, quem está na sua frente chuta direto.</li>
     <li><b>Seu turno:</b> compre 1, coloque jogadores, evolua, faça <b>1 troca de linha</b>, dê <b>1 energia</b> pra quem quiser e use eventos. No fim, <b>1 ataque</b> (encerra o turno).</li>
     <li><b>Frente vazia no fim do turno:</b> alguém de trás é obrigado a subir.</li>
     <li><b>Energia:</b> não vem na mão. Todo turno você ganha 1 pra dar, e os suportes de trás geram mais. Fica grudada no jogador, e <b>cada ataque gasta 1</b>. ${eDot("T")} Técnica, ${eDot("V")} Velocidade, ${eDot("C")} qualquer uma.</li>
