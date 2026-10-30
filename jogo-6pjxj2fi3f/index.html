@@ -211,6 +211,8 @@ html,body{overscroll-behavior:none}
 .tmn{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:4px 0 8px}.tmn input{font:700 16px inherit;font-family:inherit;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
 .detc{display:flex;justify-content:center;align-items:center;gap:10px;margin:10px 0}
 .arw{width:44px;height:64px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--gold);font-size:34px;font-weight:800;line-height:1;flex:none}
+.pkl{display:flex;flex-direction:column;gap:6px}.pk{display:flex;gap:10px;align-items:center;text-align:left;border-radius:12px;padding:6px 10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
+.pk.hi{border-color:var(--gold)}.pk .mini{width:44px;height:44px;border-radius:8px;overflow:hidden;flex:none;background:#fff}.pk .mini svg{width:100%;height:100%}.pk b{display:block}.pk small{color:var(--muted);font-size:12px;display:flex;gap:3px;align-items:center;flex-wrap:wrap}
 .mapwrap{display:flex;justify-content:center;margin:4px 0}
 .brmap{width:100%;max-width:360px;height:auto}
 .brmap .br{fill:#1B4A30;stroke:#4CC27A;stroke-width:2;stroke-linejoin:round}
@@ -1236,6 +1238,8 @@ const CRAQUES=["cap-viveros","cap-zapelli","cam-bernard","cam-fred","bah-everton
   "flu-thiagosilva","flu-hulk","gre-braithwaite","gre-kannemann","int-alanpatrick","int-carbonero","mir-reinaldo","mir-negueba",
   "rem-pikachu","rem-vitorbueno","san-neymar","san-gabigol","sao-calleri","sao-lucas","vas-thiagomendes","vas-nuno","vit-marinho","vit-pato"];
 for(const k of CRAQUES){const d=DEFS[k];if(!d||d.stage==="Ídolo")continue;d.stage="Ídolo";d.hp+=20;d.moves.forEach(m=>{m.p+=10;});}
+/* craques mais roubados (Leonardo, 2026-10-30): tanque ganha +30 de vida; suporte e carry batem +20 */
+for(const d of Object.values(DEFS))if(d.kind==="player"&&d.stage==="Ídolo"){if(d.role==="T")d.hp+=30;else d.moves.forEach(m=>{if(m.kind==="dmg")m.p+=20;});}
 
 /* ================== ARTE CARTOON ==================
    O desenho vem do módulo ArteCartoon (thread "Arte das cartas"), colado no começo da página.
@@ -1286,8 +1290,9 @@ function habDraw(s,p,n){const T=T_(s);for(let i=0;i<n;i++)draw(T);habLog(s,p,`${
 function habEnergy(s,p,n){const t=enType(s,p);for(let i=0;i<n;i++)p.en.push({def:{kind:"energy",type:t,name:EN[t]}});habLog(s,p,`ganha ${n} energia de ${EN[t]}.`);}
 function habHeal(s,p,n){if(!p.dmg)return;const v=Math.min(p.dmg,n);p.dmg-=v;habLog(s,p,`recupera ${v} de vida.`);}
 function habBuff(s,p,n){p.buff=(p.buff||0)+n;habLog(s,p,`o próximo ataque dele bate +${n}.`);}
-function habMate(s,p,n){
-  const m=fieldOf(s).filter(x=>x!==p).sort((a,b)=>(a.def.role==="C"?0:1)-(b.def.role==="C"?0:1)||(inFront(s,b)-inFront(s,a)))[0];
+async function habMate(s,p,n){
+  const sug=fieldOf(s).filter(x=>x!==p).sort((a,b)=>(a.def.role==="C"?0:1)-(b.def.role==="C"?0:1)||(inFront(s,b)-inFront(s,a)))[0];
+  const m=sug&&await chooseMate(s,fieldOf(s).filter(x=>x!==p),sug,`✨ ${p.def.name}: ${hab(p)[3]}`,`+${n} no próximo ataque. Pra quem?`);
   if(!m)return;m.buff=(m.buff||0)+n;habLog(s,p,`${m.def.name} bate +${n} no próximo ataque.`);
 }
 /* tira vida de um rival da frente (o mais machucado). Derrubou, é gol. */
@@ -1308,10 +1313,10 @@ async function habApply(s,p,e,v,ctx){
   if(e==="dd"||e==="dv"&&!ctx.from)return habDmg(s,p,v);
   if(e==="be")return searchEvent(s,p);
   if(e==="tg"){const T=T_(s);T.swLeft++;T.switched=false;return habLog(s,p,"ganha 1 troca de linha extra neste turno.");}
-  if(e==="ef"){const to=energyTarget(s,"T");if(!to)return;const t=enType(s,to);to.en.push({def:{kind:"energy",type:t,name:EN[t]}});return habLog(s,p,`dá energia de ${EN[t]} pra ${to.def.name}.`);}
+  if(e==="ef"){const to=await chooseMate(s,front(s),energyTarget(s,"T"),`✨ ${p.def.name}: ${hab(p)[3]}`,"Dá 1 energia pra um companheiro da frente. Pra quem?");if(!to)return;const t=enType(s,to);to.en.push({def:{kind:"energy",type:t,name:EN[t]}});return habLog(s,p,`dá energia de ${EN[t]} pra ${to.def.name}.`);}
   const t=ctx.target;if(!t||t==="GOAL")return;const o=other(s);
   if(e==="te"){if(t.en.length){t.en.pop();habLog(s,p,`${t.def.name} perde 1 energia.`);}return;}
-  if(e==="ro"){if(!t.en.length)return;const x=t.en.pop(),to=energyTarget(s,x.def.type)||p;to.en.push({def:x.def.kind==="energy"?x.def:{kind:"energy",type:x.def.type,name:EN[x.def.type]}});return habLog(s,p,`rouba 1 energia de ${t.def.name} e dá pra ${to.def.name}.`);}
+  if(e==="ro"){if(!t.en.length)return;const x=t.en.pop(),to=await chooseMate(s,fieldOf(s),energyTarget(s,x.def.type)||p,`✨ ${p.def.name}: ${hab(p)[3]}`,`Roubou energia de ${EN[x.def.type]} de ${t.def.name}. Pra quem vai?`)||p;to.en.push({def:x.def.kind==="energy"?x.def:{kind:"energy",type:x.def.type,name:EN[x.def.type]}});return habLog(s,p,`rouba 1 energia de ${t.def.name} e dá pra ${to.def.name}.`);}
   if(e==="pz"){if(slotOf(o,t)&&inFront(o,t)&&!t.poison){t.poison=true;habLog(s,p,`${t.def.name} ficou pressionado! 😤`);}return;}
   if(e==="mc"){if(slotOf(o,t)){t.para=true;habLog(s,p,`${t.def.name} ficou marcado e não ataca no próximo turno! 🔒`);}return;}
 }
@@ -1476,7 +1481,7 @@ async function startTurn(side,first){
   if(!first){draw(T);if(mechOf(side)==="busca"){draw(T);log(`🔎 ${nm(side)} usa a Busca e compra 1 carta a mais.`,side);}}
   for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`😤 ${p.def.name} está pressionado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp){log(`${p.def.name} não aguentou a pressão!`,other(side));await down(side,p,other(side),null);}}
   if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
-  for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
+  for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=await chooseMate(side,front(side),energyTarget(side,t),`⚡ ${sp.def.name} gera energia`,`Energia de ${EN[t]}. Pra quem da frente?`);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
   await habTurnStart(side);
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
   if(side==="ai"&&G.diff==="dificil"&&!G.online)T.energyLeft=2;
@@ -1961,6 +1966,14 @@ let ASK=null;
 function ovl(){return document.getElementById("ovl");}
 function showOv(html){const o=ovl();if(o)o.innerHTML=`<div class="ov">${html}</div>`;}
 function closeOv(){const o=ovl();if(o)o.innerHTML="";if(!G)showPick();}
+/* você escolhe quem recebe (energia do suporte e das habilidades). Computador e online: escolhe sozinho. */
+let PICKR=null;
+function chooseMate(s,list,def,title,sub){
+  if(s!=="me"||G.online||G.fast||list.length<2)return Promise.resolve(def);
+  render();
+  return new Promise(r=>{PICKR={r,list};showOv(`<div class="dlg keep"><h2>${title}</h2><p>${sub||"Escolha quem recebe:"}</p><div class="pkl">${list.map(p=>`<button type="button" class="pk ${p===def?"hi":""}" data-act="pk" data-uid="${p.uid}"><span class="mini">${chibi(p.def)}</span><span><b>${p.def.name}</b><small>${ROLEIC[p.def.role]} ${ROLENAME[p.def.role]} · ❤️${p.def.hp-p.dmg} · ${p.en.map(e=>eDot(e.def.type)).join("")||"sem energia"}${p===def?" · sugestão":""}</small></span></button>`).join("")}</div></div>`);});
+}
+document.addEventListener("click",e=>{const el=e.target.closest('[data-act="pk"]');if(!el||!PICKR)return;const {r,list}=PICKR,p=list.find(x=>x.uid===+el.dataset.uid);if(!p)return;PICKR=null;closeOv();r(p);});
 function ask(title,q,card){return new Promise(r=>{ASK=r;showOv(`<div class="dlg keep"><h2>${title}</h2><p>${q}</p><div style="display:flex;justify-content:center;margin:10px 0">${bigCard(card)}</div><div class="row"><button class="btn p" data-act="yes">Usar agora</button><button class="btn s" data-act="no">Guardar</button></div></div>`);});}
 function rulesHTML(){return `
   <h2>Como jogar</h2>
