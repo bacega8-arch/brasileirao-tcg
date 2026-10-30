@@ -1481,7 +1481,11 @@ async function startTurn(side,first){
   if(!first){draw(T);if(mechOf(side)==="busca"){draw(T);log(`🔎 ${nm(side)} usa a Busca e compra 1 carta a mais.`,side);}}
   for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`😤 ${p.def.name} está pressionado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp){log(`${p.def.name} não aguentou a pressão!`,other(side));await down(side,p,other(side),null);}}
   if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
-  for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=await chooseMate(side,front(side),energyTarget(side,t),`⚡ ${sp.def.name} gera energia`,`Energia de ${EN[t]}. Pra quem da frente?`);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
+  /* energia do suporte: quem joga escolhe pra quem vai (toca no jogador da frente). O computador dá sozinho. */
+  T.supEn=[];
+  for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t;
+    if(side==="me"||G.online){T.supEn.push({t,from:sp.def.name});log(`⚡ ${sp.def.name} gerou energia de ${EN[t]}. Toque num jogador da frente pra dar.`,side);}
+    else{const to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}}
   await habTurnStart(side);
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
   if(side==="ai"&&G.diff==="dificil"&&!G.online)T.energyLeft=2;
@@ -1499,6 +1503,7 @@ function fillFront(s){
 async function endTurn(){
   if(G.over)return;
   fillFront(G.active);
+  {const T=T_(G.active);for(const x of T.supEn||[]){const to=energyTarget(G.active,x.t);if(to)giveEnergy(G.active,x.t,to,`⚡ Energia de ${x.from} que sobrou foi pra ${to.def.name}.`);}T.supEn=[];}
   for(const p of fieldOf(G.active))p.para=false;
   G.sheet=null;G.half++;G.busy=true;
   if(G.half>=20){render();return finishMatch();}
@@ -1694,7 +1699,7 @@ function bestAction(s){
 function aiGive(s){
   const T=T_(s),f=front(s);if(!f.length||T.energyLeft<=0)return false;
   const main=CLUBS[T.club].main||"T";
-  let best=null,bs=-1;
+  let best=null,bs=-Infinity;
   for(const p of f)for(const t of ["T","V"]){
     const need=p.def.moves.some(m=>missing(p,m).length)&&!p.def.moves.some(m=>missing(p,m).length===0);
     const fits=p.def.moves.some(m=>m.cost.includes(t));
@@ -1848,7 +1853,7 @@ function render(){
       </div>
     </div>
     <div class="handBar"><div class="hl"><span>${hint()}</span></div><div class="hand">${me.hand.map(handCard).join("")}</div>
-      <div class="hl"><span>Baralho ${me.deck.length}</span><span>Energia pra dar: <b>${me.energyLeft}</b> · Troca de linha: <b>${me.switched?0:me.swLeft}</b></span></div></div>
+      <div class="hl"><span>Baralho ${me.deck.length}</span><span>Energia pra dar: <b>${me.energyLeft}</b>${(me.supEn||[]).length?` + <b>${me.supEn.length}</b> do suporte`:""} · Troca de linha: <b>${me.switched?0:me.swLeft}</b></span></div></div>
     <div class="actions"><button class="sec" data-act="log">Narração</button>${endBtn}</div>
     <aside class="sidelog"><h4>Narração</h4><ul class="log">${G.log.slice(0,80).map(l=>`<li class="${l.cls}">${l.t}</li>`).join("")}</ul>
       <div class="pw2">${["me","ai"].map(s=>{const c=CLUBS[T_(s).club].coach;return `<p><b>${c.name}</b> (${nm(s)})${T_(s).coachFired?": demitido.":`: ${c.power}. ${c.text}`}</p>`;}).join("")}</div></aside>
@@ -1901,6 +1906,7 @@ function sheetHTML(){
         btns.push(AB(`move" data-i="${i}" data-dbl="1`,`🌟 ${m.n} em dobro`,`${CLUBS[me.club].coach.power}: só 1 vez no jogo.`,"",{left:"",val:m.p*2},!ok));});
       if(c.poison)body+=`<p>😤 <b>Pressionado:</b> perde 10 de vida no começo de cada turno seu enquanto estiver na frente. Mandar pra trás tira a pressão.</p>`;
       if(c.para)body+=`<p>🔒 <b>Marcado:</b> não ataca neste turno.</p>`;
+      if(can&&inFront("me",c))(me.supEn||[]).forEach((x,i)=>btns.push(AB(`sup" data-i="${i}`,`⚡ Dar a energia de ${x.from}`,`Energia de ${EN[x.t]} gerada pelo suporte.`,"pri",{left:eDot(x.t)})));
       if(can&&me.energyLeft>0)["T","V"].forEach(t=>btns.push(AB(`give" data-t="${t}`,`Dar energia de ${EN[t]}`,"Você ganha 1 energia por turno pra dar a quem quiser.","",{left:eDot(t)})));
       if(c.free)body+=`<p>⭐ <b>Ataque grátis:</b> o próximo ataque dele não gasta energia (bônus de Ídolo e de quem evoluiu).</p>`;
       if(can&&!me.switched){
@@ -1969,7 +1975,7 @@ function closeOv(){const o=ovl();if(o)o.innerHTML="";if(!G)showPick();}
 /* você escolhe quem recebe (energia do suporte e das habilidades). Computador e online: escolhe sozinho. */
 let PICKR=null;
 function chooseMate(s,list,def,title,sub){
-  if(s!=="me"||G.online||G.fast||list.length<2)return Promise.resolve(def);
+  if(s!=="me"||G.online||list.length<2)return Promise.resolve(def);
   render();
   return new Promise(r=>{PICKR={r,list};showOv(`<div class="dlg keep"><h2>${title}</h2><p>${sub||"Escolha quem recebe:"}</p><div class="pkl">${list.map(p=>`<button type="button" class="pk ${p===def?"hi":""}" data-act="pk" data-uid="${p.uid}"><span class="mini">${chibi(p.def)}</span><span><b>${p.def.name}</b><small>${ROLEIC[p.def.role]} ${ROLENAME[p.def.role]} · ❤️${p.def.hp-p.dmg} · ${p.en.map(e=>eDot(e.def.type)).join("")||"sem energia"}${p===def?" · sugestão":""}</small></span></button>`).join("")}</div></div>`);});
 }
@@ -2486,6 +2492,7 @@ async function runAct(s,a,sh,ds){
   if(a==="tgt"){const p=findCard(sh.att);if(!p)return;const m=p.def.moves[sh.mi],t=targets(s,p,m)[+ds.i];if(t&&canAct(s,p,m)&&!me.attacked)await act(s,p,m,t,sh.dbl);return;}
   if(a==="sw"){if(c&&!me.switched){switchLine(s,c,w);if(local)G.sheet=null;render();}return;}
   if(a==="evo"){if(c&&w){evolve(s,c,w);if(local)G.sheet=null;render();}return;}
+  if(a==="sup"){const x=(me.supEn||[])[+ds.i];if(x&&c&&inFront(s,c)){me.supEn.splice(+ds.i,1);giveEnergy(s,x.t,c,`⚡ ${x.from} dá energia de ${EN[x.t]} pra ${c.def.name}.`);if(local)G.sheet=null;render();}return;}
   if(a==="give"){if(me.energyLeft>0&&c&&slotOf(s,c)){giveEnergy(s,ds.t,c);me.energyLeft--;if(local)G.sheet=null;render();}return;}
   if(a==="en"){if(c&&me.energyLeft>0){attach(s,c,w);if(local)G.sheet=null;render();}return;}
   if(a==="ev"){if(!c||!me.hand.includes(c))return;if(local)G.sheet=null;await playEvent(s,c,w);render();return;}
@@ -2495,7 +2502,7 @@ async function netLocalAct(a,sh,ds){
   if(G.online.role==="host"){if(a==="begin")return netBegin("me");return runAct("me",a,sh,ds);}
   if(a==="begin"){netSend({a:"begin"});return;}
   if(a==="move"&&sh&&sh.uid){const c=findCard(sh.uid),m=c&&c.def.moves[+ds.i];if(m&&targets("me",c,m).length>1){G.sheet={kind:"targets",att:c.uid,mi:+ds.i,dbl:!!ds.dbl};render();return;}}
-  if(["put","end","move","tgt","sw","evo","give","en","ev"].includes(a)){G.sheet=null;render();netSend({a,sh,ds});}
+  if(["put","end","move","tgt","sw","evo","give","sup","en","ev"].includes(a)){G.sheet=null;render();netSend({a,sh,ds});}
 }
 
 document.addEventListener("click",e=>{
