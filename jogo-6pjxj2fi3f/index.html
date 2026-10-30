@@ -209,6 +209,8 @@ html,body{overscroll-behavior:none}
 .warn{color:var(--pink)!important;font-size:12px}.okk{color:var(--mine)!important;font-weight:700}
 .btn:disabled{opacity:.45}
 .tmn{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:4px 0 8px}.tmn input{font:700 16px inherit;font-family:inherit;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
+.detc{display:flex;justify-content:center;align-items:center;gap:10px;margin:10px 0}
+.arw{width:44px;height:64px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--gold);font-size:34px;font-weight:800;line-height:1;flex:none}
 .mapwrap{display:flex;justify-content:center;margin:4px 0}
 .brmap{width:100%;max-width:360px;height:auto}
 .brmap .br{fill:#1B4A30;stroke:#4CC27A;stroke-width:2;stroke-linejoin:round}
@@ -2171,6 +2173,11 @@ function showAlbum(){
   <div class="row"><button class="btn s" data-act="c-home">Voltar</button></div></div>`);
 }
 document.addEventListener("input",e=>{if(e.target.id!=="tmName")return;COL.name=e.target.value.trim().slice(0,22)||"Time Roubado";colSave();});
+{let sx=null,sy=0;
+document.addEventListener("touchstart",e=>{sx=e.target.closest(".dlg.det")?e.touches[0].clientX:null;sy=e.touches[0].clientY;},{passive:true});
+document.addEventListener("touchend",e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){const dl=document.querySelector(".dlg.det"),n=dl&&detNav(dl.dataset.key,dx<0?1:-1);if(n)showDet(n);}},{passive:true});
+document.addEventListener("keydown",e=>{const dl=document.querySelector(".dlg.det");if(!dl||!["ArrowLeft","ArrowRight"].includes(e.key))return;const n=detNav(dl.dataset.key,e.key==="ArrowRight"?1:-1);if(n)showDet(n);});}
 function showTeam(){
   CV.back="team";CV.grid=teamGrid;
   const n=roleCount(),iss=teamIssues(),cc=coachClub();
@@ -2199,10 +2206,14 @@ function evoTx(d){
   const b=nx.length?`✨ Tem evolução: <b>${nx.map(x=>`${x.name} (${x.stage})`).join(", ")}</b>${nx.some(x=>!owned(x.key))?" (procure nos pacotes)":" (você já tem)"}.`:"";
   return a||b?[a,b].filter(Boolean).join("<br>"):"Sem evolução: essa carta já entra pronta.";
 }
+/* setas pra passar as cartas do álbum (na ordem e com os filtros do álbum) */
+const detList=()=>CV.back==="album"?applyF(ALL_PLAYERS,true).filter(d=>owned(d.key)).map(d=>d.key):[];
+function detNav(k,dir){const l=detList(),i=l.indexOf(k);if(i<0||!l.length)return null;return l[(i+dir+l.length)%l.length];}
 function showDet(k){
-  const d=DEFS[k];
-  showOv(`<div class="dlg"><h2>${d.name}</h2><p>${CLUBS[d.club].name} · ${rarName(d)}${isStar(d)?" ✨":""}${d.from?` · evolui de ${DEFS[d.from].name} (${DEFS[d.from].stage})`:""}${owned(k)?` · você tem ${COL.cards[k]}`:""}</p>
-  <div style="display:flex;justify-content:center;margin:10px 0">${bigCard({def:d,dmg:0,en:[]})}</div>${habBox(d)}
+  const d=DEFS[k],l=detList(),i=l.indexOf(k),nav=i>=0&&l.length>1;
+  showOv(`<div class="dlg det" data-key="${k}"><h2>${d.name}</h2><p>${CLUBS[d.club].name} · ${rarName(d)}${isStar(d)?" ✨":""}${d.from?` · evolui de ${DEFS[d.from].name} (${DEFS[d.from].stage})`:""}${owned(k)?` · você tem ${COL.cards[k]}`:""}</p>
+  <div class="detc">${nav?`<button type="button" class="arw" data-act="c-nav" data-d="-1" aria-label="Carta anterior">‹</button>`:""}${bigCard({def:d,dmg:0,en:[]})}${nav?`<button type="button" class="arw" data-act="c-nav" data-d="1" aria-label="Próxima carta">›</button>`:""}</div>
+  ${nav?`<p style="text-align:center;font-size:12px;margin:0 0 6px">${i+1} de ${l.length} · deslize ou use as setas</p>`:""}${habBox(d)}
   <div class="habx" style="border-color:var(--line)">${evoTx(d)}</div>
   <div class="row"><button class="btn s" data-act="c-back">Voltar</button></div></div>`);
 }
@@ -2221,6 +2232,7 @@ document.addEventListener("click",e=>{
   if(a==="c-all"){if(isDono()){ALL_PLAYERS.forEach(d=>{COL.cards[d.key]=Math.max(1,COL.cards[d.key]||0);});colSave();}return showCol();}
   if(a==="c-club"){CV.club=el.dataset.club;return showAlbum();}
   if(a==="c-det")return showDet(el.dataset.key);
+  if(a==="c-nav"){const dl=document.querySelector(".dlg.det"),n=dl&&detNav(dl.dataset.key,+el.dataset.d);if(n)showDet(n);return;}
   if(a==="c-back")return colBack();
   if(a==="c-team")return showTeam();
   if(a==="c-role"){CV.role=el.dataset.r;return showTeam();}
