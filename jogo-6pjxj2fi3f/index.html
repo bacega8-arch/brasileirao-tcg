@@ -208,6 +208,7 @@ html,body{overscroll-behavior:none}
 .chip.on{background:var(--gold);color:#231A00}
 .warn{color:var(--pink)!important;font-size:12px}.okk{color:var(--mine)!important;font-weight:700}
 .btn:disabled{opacity:.45}
+.tmn{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:4px 0 8px}.tmn input{font:700 16px inherit;font-family:inherit;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
 .mapwrap{display:flex;justify-content:center;margin:4px 0}
 .brmap{width:100%;max-width:360px;height:auto}
 .brmap .br{fill:#1B4A30;stroke:#4CC27A;stroke-width:2;stroke-linejoin:round}
@@ -2169,11 +2170,13 @@ function showAlbum(){
   showOv(`<div class="dlg"><h2>Álbum</h2>${essHTML()}${filterBar(true)}${albumGrid()}
   <div class="row"><button class="btn s" data-act="c-home">Voltar</button></div></div>`);
 }
+document.addEventListener("input",e=>{if(e.target.id!=="tmName")return;COL.name=e.target.value.trim().slice(0,22)||"Time Roubado";colSave();});
 function showTeam(){
   CV.back="team";CV.grid=teamGrid;
   const n=roleCount(),iss=teamIssues(),cc=coachClub();
   const mine=teamDefs().sort((a,b)=>"DMA".indexOf(a.pos)-"DMA".indexOf(b.pos));
   showOv(`<div class="dlg"><h2>Montar time roubado</h2>
+  <label class="tmn">Nome do time <input id="tmName" maxlength="22" value="${esc(COL.name||"")}" placeholder="Time Roubado" autocomplete="off"></label>
   <p>${COL.team.length}/${TEAM_SIZE} · 🛡️${n.D}/${TEAM_TIP.D} ✨${n.M}/${TEAM_TIP.M} ⚔️${n.A}/${TEAM_TIP.A} <small>(sugestão)</small></p>
   ${iss.length?`<p class="warn">${iss.join(" ")}</p>`:`<p class="okk">Time pronto pra jogar!</p>`}
   ${COL.team.length?`<h3 class="sub">Técnico (de um clube do seu time)</h3><div class="chips">${teamClubs().map(k=>`<button type="button" class="chip ${k===cc?"on":""}" data-act="c-coach" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
@@ -2190,10 +2193,17 @@ document.addEventListener("input",e=>{
   CV.f.q=e.target.value;const g=document.getElementById("cgrid");if(g)g.outerHTML=CV.grid();
 });
 function keepScroll(fn){const d=document.querySelector(".ov .dlg"),y=d?d.scrollTop:0;fn();const d2=document.querySelector(".ov .dlg");if(d2)d2.scrollTop=y;}
+function evoTx(d){
+  const nx=Object.values(DEFS).filter(x=>x.kind==="player"&&x.from===d.key);
+  const a=d.from?`↑ Evolui de <b>${DEFS[d.from].name} (${DEFS[d.from].stage})</b>: pra jogar, coloque em cima dele em campo.`:"";
+  const b=nx.length?`✨ Tem evolução: <b>${nx.map(x=>`${x.name} (${x.stage})`).join(", ")}</b>${nx.some(x=>!owned(x.key))?" (procure nos pacotes)":" (você já tem)"}.`:"";
+  return a||b?[a,b].filter(Boolean).join("<br>"):"Sem evolução: essa carta já entra pronta.";
+}
 function showDet(k){
   const d=DEFS[k];
   showOv(`<div class="dlg"><h2>${d.name}</h2><p>${CLUBS[d.club].name} · ${rarName(d)}${isStar(d)?" ✨":""}${d.from?` · evolui de ${DEFS[d.from].name} (${DEFS[d.from].stage})`:""}${owned(k)?` · você tem ${COL.cards[k]}`:""}</p>
   <div style="display:flex;justify-content:center;margin:10px 0">${bigCard({def:d,dmg:0,en:[]})}</div>${habBox(d)}
+  <div class="habx" style="border-color:var(--line)">${evoTx(d)}</div>
   <div class="row"><button class="btn s" data-act="c-back">Voltar</button></div></div>`);
 }
 const colBack=()=>CV.back==="album"?showAlbum():CV.back==="team"?showTeam():CV.back==="pack"?showPack():showCol();
@@ -2254,7 +2264,7 @@ const BK={ready:false,uid:null,
 };
 let NET=null,ON_TEAM=null,LOBBY={},OFF=[];
 const offAll=()=>{OFF.forEach(f=>{try{f();}catch(e){}});OFF=[];};
-const teamLabel=k=>k==="meu"?`⭐ ${COL.name}`:CLUBS[k].name;
+const teamLabel=k=>k==="meu"?`⭐ ${esc(COL.name)}`:CLUBS[k].name;
 
 /* ---- tela: nome e time ---- */
 function showOnline(msg){
@@ -2264,7 +2274,7 @@ function showOnline(msg){
   ${msg?`<p class="warn">${msg}</p>`:""}
   ${ACC?`<p>Você está na conta <b style="color:var(--fg)">${esc(ACC.nick)}</b>. Suas cartas e essências ficam salvas na nuvem.</p>`:`<p class="warn">Pra jogar online você precisa entrar na sua conta (nick + código).</p><div class="row"><button class="btn p" data-act="o-logout">Entrar na conta</button></div>`}
   <h3 class="sub">Com qual time?</h3>
-  <div class="chips">${teamOk()?`<button type="button" class="chip ${ON_TEAM==="meu"?"on":""}" data-act="o-team" data-club="meu">⭐ ${COL.name}</button>`:""}${ORDER().map(k=>`<button type="button" class="chip ${ON_TEAM===k?"on":""}" data-act="o-team" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
+  <div class="chips">${teamOk()?`<button type="button" class="chip ${ON_TEAM==="meu"?"on":""}" data-act="o-team" data-club="meu">⭐ ${esc(COL.name)}</button>`:""}${ORDER().map(k=>`<button type="button" class="chip ${ON_TEAM===k?"on":""}" data-act="o-team" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
   <p style="font-size:12px">Time escolhido: <b style="color:var(--fg)">${teamLabel(ON_TEAM)}</b></p>
   <div class="row"><button class="btn p" data-act="o-enter">Entrar no saguão</button><button class="btn s" data-act="newgame">Voltar</button></div></div>`);
 }
