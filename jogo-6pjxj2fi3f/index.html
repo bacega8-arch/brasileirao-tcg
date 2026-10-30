@@ -1889,8 +1889,11 @@ function rollCard(pos){
   const src=stars.length&&Math.random()<STAR_CHANCE?stars:commons;
   return src[rnd(src.length)];
 }
+/* modo dono: o criador do jogo (conta "Porps") tem essências e pacotes infinitos */
+const DONO="porps";
+const isDono=()=>typeof ACC!=="undefined"&&!!ACC&&ACC.key===DONO;
 function openPack(){
-  if(COL.packs>0)COL.packs--;else if(COL.ess>=PACK_COST)COL.ess-=PACK_COST;else return null;
+  if(isDono());else if(COL.packs>0)COL.packs--;else if(COL.ess>=PACK_COST)COL.ess-=PACK_COST;else return null;
   const got=PACK_SLOTS.map(pos=>{
     const d=rollCard(pos),dup=owned(d.key);
     COL.cards[d.key]=(COL.cards[d.key]||0)+1;if(dup)COL.ess+=DUP_ESS;
@@ -1940,15 +1943,15 @@ function matchReward(meGoals,res){
 
 /* ---- telas ---- */
 let CV={role:"all",club:null,back:"home",pack:null};
-const essHTML=()=>`<div class="essbar"><span>💠 <b>${COL.ess}</b> essências</span>${COL.packs?`<span>🎁 <b>${COL.packs}</b> grátis</span>`:""}<span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`;
+const essHTML=()=>isDono()?`<div class="essbar"><span>👑 <b>Modo dono</b></span><span>💠 <b>∞</b> essências</span><span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`:`<div class="essbar"><span>💠 <b>${COL.ess}</b> essências</span>${COL.packs?`<span>🎁 <b>${COL.packs}</b> grátis</span>`:""}<span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`;
 const colCard=(d,o={})=>`<button type="button" class="hc player f-${frameOf(d)} ${isStar(d)?"star":""} ${o.cls||""}" data-act="${o.act||"c-det"}" data-key="${d.key}"><span class="k">${ROLEIC[d.role]} ${CLUBS[d.club].code}</span><div class="mini">${chibi(d)}</div><span class="nm">${d.name}</span>${o.badge?`<span class="bdg ${o.bc||""}">${o.badge}</span>`:""}</button>`;
 function showCol(){
   G=null;ASK=null;CV.back="home";ensureShell();document.getElementById("screen").innerHTML="";
-  const canPack=COL.packs>0||COL.ess>=PACK_COST;
+  const canPack=isDono()||COL.packs>0||COL.ess>=PACK_COST;
   const n=roleCount(),ok=teamOk();
   showOv(`<div class="dlg"><h2>Pacotes e coleção</h2>${essHTML()}
   <div class="pkbig"><div class="pkimg">🎴</div><div><b>Pacote do Brasileirão</b><small>5 jogadores de qualquer clube: 1 tanque, 1 suporte, 2 carries e 1 surpresa. Às vezes vem um Craque ✨. Repetida vira +${DUP_ESS} 💠.</small></div></div>
-  <div class="row"><button class="btn p" data-act="c-open" ${canPack?"":"disabled"}>${COL.packs?"Abrir pacote grátis":`Abrir pacote · ${PACK_COST} 💠`}</button></div>
+  <div class="row"><button class="btn p" data-act="c-open" ${canPack?"":"disabled"}>${isDono()?"Abrir pacote 👑":COL.packs?"Abrir pacote grátis":`Abrir pacote · ${PACK_COST} 💠`}</button>${isDono()?`<button class="btn s" data-act="c-all">👑 Pegar todas as cartas</button>`:""}</div>
   ${canPack?"":`<p style="font-size:12px">Faltam ${PACK_COST-COL.ess} 💠. Jogue partidas pra ganhar: vitória +${REWARD.win}, empate +${REWARD.draw}, derrota +${REWARD.loss} e +${REWARD.goal} por gol seu.</p>`}
   <h3 class="sub">Seu time roubado</h3>
   <p>${COL.team.length}/${TEAM_SIZE} jogadores · 🛡️${n.D} ✨${n.M} ⚔️${n.A}${COL.team.length?` · técnico ${CLUBS[coachClub()].coach.name}`:""}</p>
@@ -1961,7 +1964,7 @@ function showPack(){
   showOv(`<div class="dlg"><h2>${all?"Seu pacote":"Toque nas cartas"}</h2>${essHTML()}
   <div class="pkrow">${got.map((x,i)=>x.up?colCard(x.d,{act:"c-det",badge:x.dup?`+${DUP_ESS} 💠`:"NOVO",bc:x.dup?"dup":"new",cls:"flipin"}):`<button type="button" class="pkback" data-act="c-flip" data-i="${i}" aria-label="Virar carta ${i+1}"><span>🎴</span></button>`).join("")}</div>
   ${all?`<p>${got.filter(x=>!x.dup).length} cartas novas${got.some(x=>isStar(x.d))?" · veio Craque! ✨":""}.</p>`:""}
-  <div class="row">${all?`<button class="btn p" data-act="c-open" ${COL.packs>0||COL.ess>=PACK_COST?"":"disabled"}>Abrir outro</button><button class="btn s" data-act="c-home">Coleção</button>`:`<button class="btn p" data-act="c-flipall">Virar todas</button>`}</div></div>`);
+  <div class="row">${all?`<button class="btn p" data-act="c-open" ${isDono()||COL.packs>0||COL.ess>=PACK_COST?"":"disabled"}>Abrir outro</button><button class="btn s" data-act="c-home">Coleção</button>`:`<button class="btn p" data-act="c-flipall">Virar todas</button>`}</div></div>`);
 }
 function showAlbum(){
   CV.back="album";
@@ -2007,6 +2010,7 @@ document.addEventListener("click",e=>{
   if(a==="c-flip"){CV.pack[+el.dataset.i].up=true;return showPack();}
   if(a==="c-flipall"){CV.pack.forEach(x=>x.up=true);return showPack();}
   if(a==="c-album")return showAlbum();
+  if(a==="c-all"){if(isDono()){ALL_PLAYERS.forEach(d=>{COL.cards[d.key]=Math.max(1,COL.cards[d.key]||0);});colSave();}return showCol();}
   if(a==="c-club"){CV.club=el.dataset.club;return showAlbum();}
   if(a==="c-det")return showDet(el.dataset.key);
   if(a==="c-back")return colBack();
