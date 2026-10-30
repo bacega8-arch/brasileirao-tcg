@@ -206,6 +206,21 @@ html,body{overscroll-behavior:none}
 .chip.on{background:var(--gold);color:#231A00}
 .warn{color:var(--pink)!important;font-size:12px}.okk{color:var(--mine)!important;font-weight:700}
 .btn:disabled{opacity:.45}
+.mapwrap{display:flex;justify-content:center;margin:4px 0}
+.brmap{width:100%;max-width:360px;height:auto}
+.brmap .br{fill:#1B4A30;stroke:#4CC27A;stroke-width:2;stroke-linejoin:round}
+.brmap .pin{cursor:pointer}.brmap .pin circle{fill:var(--gold);stroke:#231A00;stroke-width:2}.brmap .pin.on circle{fill:var(--pink)}
+.brmap .pin text{font:800 15px var(--f-display);fill:#231A00}.brmap .pin text.uf{fill:var(--fg);font-size:14px;paint-order:stroke;stroke:#0B1510;stroke-width:3px}
+.qlist{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.qc{display:flex;gap:10px;align-items:center;text-align:left;border-radius:12px;padding:9px 12px;border:1px solid var(--line);background:var(--panel2)}
+.qc i{width:26px;height:26px;border-radius:50%;flex:none;background:linear-gradient(135deg,var(--c1) 50%,var(--c2) 50%);border:1.5px solid rgba(255,255,255,.6)}
+.qc b{font-family:var(--f-display);font-size:17px;text-transform:uppercase;display:block}.qc small{color:var(--muted);font-size:12px}
+@media (min-width:1000px) and (orientation:landscape){.qlist{display:grid;grid-template-columns:1fr 1fr}}
+.modes{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0}
+.mode{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border-radius:14px;padding:12px 14px;border:1px solid var(--line);background:var(--panel2)}
+.mode b{font-family:var(--f-display);font-size:20px;text-transform:uppercase}.mode small{color:var(--muted);font-size:12px}.mode small.rw{color:var(--gold)}
+.mode.hi{background:linear-gradient(135deg,#3B2A00,#1B3027);border-color:var(--gold)}
+@media (min-width:1000px) and (orientation:landscape){.modes{grid-template-columns:1fr 1fr}}
 .fbar{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:8px;border-radius:12px;background:#0A1611;border:1px solid var(--line)}
 .fbar .chips{margin:2px 0}.chips.scr{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.chips.scr .chip{flex:none}
 .inp{width:100%;font:inherit;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#0A1611;color:var(--fg)}
@@ -1250,8 +1265,8 @@ function newTeam(club){
   return T;
 }
 function draw(T){if(T.deck.length)T.hand.push(T.deck.shift());}
-function startGame(myClub,aiClub){
-  G={half:0,active:"me",phase:"setup",busy:false,sheet:null,log:[],stadium:null,fast:false,over:false,
+function startGame(myClub,aiClub,diff){
+  G={diff:diff||"medio",half:0,active:"me",phase:"setup",busy:false,sheet:null,log:[],stadium:null,fast:false,over:false,
      t:{me:newTeam(myClub),ai:newTeam(aiClub)}};
   closeOv();
   aiSetup();
@@ -1345,6 +1360,7 @@ async function startTurn(side,first){
   if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
   for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
+  if(side==="ai"&&G.diff==="dificil"&&!G.online)T.energyLeft=2;
   if(G.half===10)log("⏱️ Intervalo! Começa o segundo tempo.","big");
   render();
   if(side==="ai"&&!G.online){await sleep(700*SPEED());await aiTurn();}
@@ -1441,7 +1457,7 @@ function knockOut(side,p){
 }
 async function useReaction(side,key,question){
   const T=T_(side),c=T.hand.find(x=>x.def.key===key);if(!c)return false;
-  const yes=side==="ai"?(G.online?await netAsk(key,question):Math.random()<.8):await ask(EV[key].name,question,c);
+  const yes=side==="ai"?(G.online?await netAsk(key,question):Math.random()<({facil:.3,dificil:1}[G.diff]||.8)):await ask(EV[key].name,question,c);
   if(yes&&side==="ai"&&!G.online)await announce(c,`🪤 ${nm(side)} usa uma carta de resposta!`);
   if(yes){T.hand.splice(T.hand.indexOf(c),1);T.discard.push(c);log(`${nm(side)} usa ${c.def.name}!`,side);render();}
   return yes;
@@ -1561,9 +1577,9 @@ async function aiTurn(){
   if(dir&&canPlayEvent(s,dir)){await playEvent(s,dir);await wait();}
   const lan=T.hand.find(c=>c.def.key==="lancamento");
   if(lan&&front(s).length>1){await playEvent(s,lan);await wait();}
-  while(T.energyLeft>0&&aiGive(s)){render();await wait();}
+  while(T.energyLeft>0&&!(G.diff==="facil"&&Math.random()<.35)&&aiGive(s)){render();await wait();}
   const man=T.hand.find(c=>c.def.key==="mandrake");
-  let a=bestAction(s);
+  let a=G.diff==="facil"&&Math.random()<.45?randAction(s):bestAction(s);
   if(man&&canPlayEvent(s,man)&&(!a||a.t!=="GOAL")){await playEvent(s,man);return;}
   if(a){
     const esc=T.hand.find(c=>c.def.key==="escanteio");
@@ -1597,8 +1613,8 @@ async function finishMatch(){
   showOv(`<div class="dlg"><h2>${me>ai?"Vitória!":"Derrota"}</h2>
     <p style="font-size:18px;color:var(--fg)">${score()}</p>
     ${pens?`<p>Nos pênaltis: ${pens.me} x ${pens.ai}</p><p style="font-size:12px">${pens.seq.join(" · ")}</p>`:""}
-    <div class="essbar"><span>💠 +<b>${ess}</b> essências</span><span>Total: ${COL.ess}</span></div>
-    <div class="row"><button class="btn p" data-act="newgame">Jogar de novo</button><button class="btn s" data-act="c-home">Pacotes</button><button class="btn s" data-act="close">Ver o campo</button></div></div>`);
+    ${G.diff==="treino"?`<p>🏋️ Treino: não vale essências. Jogue o Clássico pra ganhar!</p>`:`<div class="essbar"><span>💠 +<b>${ess}</b> essências</span><span>Total: ${COL.ess}</span>${DIFF[G.diff]&&!G.online?`<span>${DIFF[G.diff].ic} ${DIFF[G.diff].n}</span>`:""}</div>`}
+    <div class="row"><button class="btn p" data-act="${G.diff==="treino"||G.online?"newgame":"m-classic"}">Jogar de novo</button>${G.diff==="treino"&&!G.online?`<button class="btn s" data-act="m-treino">Outro clássico</button>`:""}<button class="btn s" data-act="${G.online?"c-home":"newgame"}">${G.online?"Pacotes":"Menu"}</button><button class="btn s" data-act="close">Ver o campo</button></div></div>`);
 }
 
 /* ================== TELA ================== */
@@ -1778,9 +1794,9 @@ document.addEventListener("click",async e=>{
   if(el.classList.contains("sheetWrap")&&e.target.closest("[data-stop]"))return;
   const a=el.dataset.act;
   if(a==="pick"){PICK=el.dataset.club;showPick(true);return;}
-  if(a==="rival"){const pool=ORDER().filter(x=>x!==PICK),k=el.dataset.club==="rnd"?pool[rnd(pool.length)]:el.dataset.club;startGame(PICK,k);return;}
+  if(a==="rival"){const pool=ORDER().filter(x=>x!==PICK),k=el.dataset.club==="rnd"?pool[rnd(pool.length)]:el.dataset.club;startGame(PICK,k,TREINO?"treino":"medio");return;}
   if(a==="lore"){showLore(el.dataset.club);return;}
-  if(a==="newgame"){if(NET)netLeave(!!(G&&G.over));clearMatch();PICK=null;showPick();return;}
+  if(a==="newgame"){if(NET)netLeave(!!(G&&G.over));clearMatch();PICK=null;TREINO=false;showPick();return;}
   if(a==="close"){closeOv();return;}
   if(a==="kick"){closeOv();if(G&&G.phase==="play"&&G.half===0&&!G.started){G.started=true;startTurn("me",true);}return;}
   if(a==="back"){showPick(!!PICK);return;}
@@ -1827,14 +1843,15 @@ function showRules(){showOv(`<div class="dlg">${rulesHTML()}<div class="row"><bu
 let PICK=null;
 const ORDER=()=>Object.keys(CLUBS).filter(k=>k!=="meu").sort((a,b)=>CLUBS[a].name.localeCompare(CLUBS[b].name,"pt"));
 function showPick(rival){
+  if(!rival&&!TREINO)return showMenu();
   G=null;ASK=null;if(!rival)PICK=null;
   ensureShell();document.getElementById("screen").innerHTML="";
   const list=ORDER().filter(k=>k!==PICK);
-  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"Brasileirão Cards"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha seu time. Toque no ℹ️ pra ler a história e a mecânica do clube."}</p>
-  ${rival?"":`${essHTML()}<div class="row" style="margin:0 0 10px"><button class="btn p" data-act="c-home">🎴 Pacotes e coleção</button><button class="btn s" data-act="c-play" ${teamOk()?"":"disabled"}>⭐ ${COL.name}</button><button class="btn p" data-act="o-home">🌐 Jogar online</button></div><p style="font-size:12px">Ou jogue com um time pronto:</p>`}
+  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"🏋️ Treino"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha um time pronto pra treinar. Toque no ℹ️ pra ler a história e a mecânica do clube. O treino não vale essências."}</p>
+  ${rival?"":`<div class="row" style="margin:0 0 8px"><button class="btn s" data-act="m-treino">Voltar aos clássicos</button></div>`}
   ${rival?`<div class="row" style="margin:8px 0"><button class="btn p" data-act="rival" data-club="rnd">🎲 Sortear rival</button><button class="btn s" data-act="newgame">Voltar</button></div>`:""}
   <div class="clubs">${list.map(k=>`<div class="cl" style="--c1:${CLUBS[k].c1};--c2:${CLUBS[k].c2}"><button class="go" data-act="${rival?"rival":"pick"}" data-club="${k}"><i></i><b>${CLUBS[k].name}</b><small>${CLUBS[k].coach.power}</small></button><button class="inf" data-act="lore" data-club="${k}" aria-label="História do ${CLUBS[k].name}">ℹ️</button></div>`).join("")}</div>
-  ${rival?"":`<div class="row"><button class="btn s" data-act="rules">Como jogar</button></div>`}</div>`);
+  </div>`);
 }
 function showLore(k){
   const c=CLUBS[k],lo=c.lore||{};
@@ -1946,7 +1963,8 @@ function buildMine(){
 
 /* ---- prêmio no fim do jogo ---- */
 function matchReward(meGoals,res){
-  const ess=REWARD[res]+REWARD.goal*meGoals;
+  if(G&&G.diff==="treino")return 0;
+  const R=(DIFF[G&&G.diff]||DIFF.medio).rew,ess=R[res]+R.goal*meGoals;
   COL.ess+=ess;COL.stats[res==="win"?"w":res==="draw"?"d":"l"]++;colSave();
   return ess;
 }
@@ -1962,7 +1980,7 @@ function showCol(){
   showOv(`<div class="dlg"><h2>Pacotes e coleção</h2>${essHTML()}
   <div class="pkbig"><div class="pkimg">🎴</div><div><b>Pacote do Brasileirão</b><small>5 jogadores de qualquer clube: 1 tanque, 1 suporte, 2 carries e 1 surpresa. Às vezes vem um Craque ✨. Repetida vira +${DUP_ESS} 💠.</small></div></div>
   <div class="row"><button class="btn p" data-act="c-open" ${canPack?"":"disabled"}>${isDono()?"Abrir pacote 👑":COL.packs?"Abrir pacote grátis":`Abrir pacote · ${PACK_COST} 💠`}</button>${isDono()?`<button class="btn s" data-act="c-all">👑 Pegar todas as cartas</button>`:""}</div>
-  ${canPack?"":`<p style="font-size:12px">Faltam ${PACK_COST-COL.ess} 💠. Jogue partidas pra ganhar: vitória +${REWARD.win}, empate +${REWARD.draw}, derrota +${REWARD.loss} e +${REWARD.goal} por gol seu.</p>`}
+  ${canPack?"":`<p style="font-size:12px">Faltam ${PACK_COST-COL.ess} 💠. Jogue o <b>Clássico</b> pra ganhar: no médio, vitória +${DIFF.medio.rew.win}; no difícil, +${DIFF.dificil.rew.win}.</p><div class="row"><button class="btn p" data-act="m-classic">⚔️ Jogar Clássico</button></div>`}
   <h3 class="sub">Seu time roubado</h3>
   <p>${COL.team.length}/${TEAM_SIZE} jogadores · 🛡️${n.D} ✨${n.M} ⚔️${n.A}${COL.team.length?` · técnico ${CLUBS[coachClub()].coach.name}`:""}</p>
   <div class="row"><button class="btn s" data-act="c-team">Montar time</button><button class="btn s" data-act="c-album">Ver álbum</button><button class="btn ${ok?"p":"s"}" data-act="c-play" ${ok?"":"disabled"}>Jogar com ele</button></div>
@@ -2063,7 +2081,7 @@ document.addEventListener("click",e=>{
   if(a==="c-coach"){COL.coach=el.dataset.club;colSave();return showTeam();}
   if(a==="c-auto"){autoTeam();return showTeam();}
   if(a==="c-clear"){COL.team=[];colSave();return showTeam();}
-  if(a==="c-play"){if(!teamOk())return showTeam();buildMine();PICK="meu";return showPick(true);}
+  if(a==="c-play")return showClassic();
 });
 
 
@@ -2106,10 +2124,7 @@ function showOnline(msg){
   if(!ON_TEAM||(ON_TEAM==="meu"&&!teamOk()))ON_TEAM=teamOk()?"meu":"cor";
   showOv(`<div class="dlg"><h2>Jogar online</h2>
   ${msg?`<p class="warn">${msg}</p>`:""}
-  ${ACC?`<p>Você está na conta <b style="color:var(--fg)">${esc(ACC.nick)}</b>. Suas cartas e essências ficam salvas na nuvem. <button type="button" class="chip" data-act="o-logout">Trocar de conta</button></p>`:`
-  <p>Seu nick (é o que seus amigos vão ver) e um código de 4 números. Com eles você entra na sua conta em qualquer celular, e suas cartas ficam salvas.</p>
-  <input id="nmIn" class="inp" maxlength="16" placeholder="Nick, ex.: Leo do Verdão" value="${NAME.replace(/"/g,"&quot;")}">
-  <input id="pinIn" class="inp" style="margin-top:6px" inputmode="numeric" maxlength="4" placeholder="Código de 4 números" type="password">`}
+  ${ACC?`<p>Você está na conta <b style="color:var(--fg)">${esc(ACC.nick)}</b>. Suas cartas e essências ficam salvas na nuvem.</p>`:`<p class="warn">Pra jogar online você precisa entrar na sua conta (nick + código).</p><div class="row"><button class="btn p" data-act="o-logout">Entrar na conta</button></div>`}
   <h3 class="sub">Com qual time?</h3>
   <div class="chips">${teamOk()?`<button type="button" class="chip ${ON_TEAM==="meu"?"on":""}" data-act="o-team" data-club="meu">⭐ ${COL.name}</button>`:""}${ORDER().map(k=>`<button type="button" class="chip ${ON_TEAM===k?"on":""}" data-act="o-team" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
   <p style="font-size:12px">Time escolhido: <b style="color:var(--fg)">${teamLabel(ON_TEAM)}</b></p>
@@ -2119,7 +2134,8 @@ const readName=()=>{const el=document.getElementById("nmIn");if(el){NAME=el.valu
 
 /* ---- saguão ---- */
 async function enterLobby(){
-  if(!ACC){
+  if(!ACC)return showLogin("Entre na sua conta pra jogar online.");
+  if(false){
     const pinEl=document.getElementById("pinIn"),pin=pinEl?pinEl.value.trim():"";
     if(!readName())return showOnline("Coloque seu nick primeiro.");
     if(!/^\d{4}$/.test(pin))return showOnline("O código precisa ter 4 números.");
@@ -2313,7 +2329,9 @@ document.addEventListener("click",e=>{
   const el=e.target.closest("[data-act^='o-']");if(!el)return;
   const a=el.dataset.act;
   if(a==="o-home")return showOnline();
-  if(a==="o-logout"){accLogout();return showOnline();}
+  if(a==="o-logout"){accLogout();return showLogin();}
+  if(a==="o-login")return doLogin();
+  if(a==="o-skip"){NOLOGIN=true;return showPick();}
   if(a==="o-team"){readName();ON_TEAM=el.dataset.club;return showOnline();}
   if(a==="o-enter")return enterLobby();
   if(a==="o-back"){NET=null;return drawLobby();}
@@ -2376,14 +2394,145 @@ async function accSyncAtStart(){
     accPush();
   }catch(e){}
 }
+/* tela de login: aparece ao abrir o jogo */
+let NOLOGIN=false;
+function showLogin(msg){
+  G=null;ASK=null;ensureShell();document.getElementById("screen").innerHTML="";
+  showOv(`<div class="dlg"><h2>Brasileirão Cards</h2>
+  ${msg?`<p class="warn">${msg}</p>`:""}
+  <p>Entre com seu <b style="color:var(--fg)">nick</b> e um <b style="color:var(--fg)">código de 4 números</b>. Na primeira vez, isso cria sua conta. Depois é só usar os mesmos em qualquer celular para recuperar suas cartas e essências.</p>
+  <input id="nmIn" class="inp" maxlength="16" placeholder="Nick, ex.: Leo do Verdão" value="${NAME.replace(/"/g,"&quot;")}">
+  <input id="pinIn" class="inp" style="margin-top:6px" inputmode="numeric" maxlength="4" placeholder="Código de 4 números" type="password">
+  <div class="row"><button class="btn p" data-act="o-login">Entrar</button><button class="btn s" data-act="o-skip">Jogar sem conta</button></div>
+  <p style="font-size:12px">Sem conta você joga contra o computador normalmente, mas as cartas ficam só neste aparelho e não dá pra jogar online.</p></div>`);
+}
+async function doLogin(){
+  const pinEl=document.getElementById("pinIn"),pin=pinEl?pinEl.value.trim():"";
+  if(!readName())return showLogin("Coloque seu nick primeiro.");
+  if(!/^\d{4}$/.test(pin))return showLogin("O código precisa ter 4 números.");
+  showOv(`<div class="dlg"><h2>Entrando…</h2><p>Buscando sua conta.</p></div>`);
+  try{await accLogin(NAME,pin);}catch(e){console.error(e);return showLogin(e.message==="dono"?"Esse nick já tem dono e o código não bate. Confira o código ou escolha outro nick.":`Não consegui conectar. Confira a internet e tente de novo. (${esc(e.code||e.message||"erro")})`);}
+  showPick();
+}
 function accLogout(){ACC=null;try{localStorage.removeItem(ACC_KEY);}catch(e){}}
+/* ================== MODOS ==================
+   Clássico: seu time roubado contra o computador (fácil, médio, difícil), vale essências.
+   Treino: qualquer time pronto, só pra testar, não vale essências. */
+let TREINO=false;
+const DIFF={
+  facil:{n:"Fácil",ic:"🟢",tx:"O computador erra bastante e quase não usa cartas de resposta.",rew:{win:60,draw:30,loss:15,goal:5}},
+  medio:{n:"Médio",ic:"🟡",tx:"O computador joga direitinho.",rew:{win:100,draw:50,loss:25,goal:10}},
+  dificil:{n:"Difícil",ic:"🔴",tx:"O computador não perdoa e ganha 2 energias por turno.",rew:{win:180,draw:90,loss:40,goal:15}}
+};
+const accLine=()=>ACC?`<p style="font-size:13px">👤 <b style="color:var(--fg)">${esc(ACC.nick)}</b> · cartas salvas na nuvem <button type="button" class="chip" data-act="o-logout">Sair</button></p>`:`<p style="font-size:13px">👤 Jogando sem conta <button type="button" class="chip" data-act="o-logout">Entrar</button></p>`;
+function showMenu(){
+  G=null;ASK=null;PICK=null;TREINO=false;ensureShell();document.getElementById("screen").innerHTML="";
+  showOv(`<div class="dlg"><h2>Brasileirão Cards</h2>${accLine()}${essHTML()}
+  <div class="modes">
+    <button type="button" class="mode hi" data-act="m-classic"><b>⚔️ Clássico</b><small>Seu time roubado contra o computador: fácil, médio ou difícil. Vale essências!</small></button>
+    <button type="button" class="mode" data-act="o-home"><b>🌐 Online</b><small>Desafie seus amigos que estiverem online.</small></button>
+    <button type="button" class="mode" data-act="c-home"><b>🎴 Pacotes e coleção</b><small>Abra pacotes, veja o álbum e monte seu time.</small></button>
+    <button type="button" class="mode" data-act="m-treino"><b>🏋️ Treino: Grandes Clássicos</b><small>Mapa do Brasil com os clássicos e a história de cada um. Não vale essências.</small></button>
+  </div>
+  <div class="row"><button class="btn s" data-act="rules">Como jogar</button></div></div>`);
+}
+function showClassic(){
+  G=null;ensureShell();document.getElementById("screen").innerHTML="";
+  if(!teamOk())return showOv(`<div class="dlg"><h2>Clássico</h2>
+    <p>Pra jogar o Clássico você precisa de um <b style="color:var(--fg)">time roubado</b> com ${TEAM_SIZE} jogadores. Abra pacotes e monte o seu (tem o botão "Completar sozinho").</p>
+    <p class="warn">${teamIssues().join(" ")}</p>
+    <div class="row"><button class="btn p" data-act="c-team">Montar time</button><button class="btn s" data-act="c-home">Pacotes</button><button class="btn s" data-act="newgame">Voltar</button></div></div>`);
+  const cc=coachClub(),n=roleCount();
+  showOv(`<div class="dlg"><h2>Clássico</h2>${essHTML()}
+  <p>Seu time: <b style="color:var(--fg)">⭐ ${esc(COL.name)}</b> · 🛡️${n.D} ✨${n.M} ⚔️${n.A} · técnico ${CLUBS[cc].coach.name}. O rival é sorteado entre os 20 clubes.</p>
+  <h3 class="sub">Escolha a dificuldade</h3>
+  <div class="modes">${Object.entries(DIFF).map(([k,d])=>`<button type="button" class="mode" data-act="m-diff" data-d="${k}"><b>${d.ic} ${d.n}</b><small>${d.tx}</small><small class="rw">Vitória +${d.rew.win} 💠 · empate +${d.rew.draw} · derrota +${d.rew.loss} · +${d.rew.goal} por gol</small></button>`).join("")}</div>
+  <div class="row"><button class="btn s" data-act="c-team">Mudar time</button><button class="btn s" data-act="newgame">Voltar</button></div></div>`);
+}
+/* jogada aleatória do computador no fácil */
+function randAction(s){
+  const all=[];
+  for(const p of fieldOf(s))for(const m of p.def.moves){if(!payable(p,m)||p.para)continue;for(const t of targets(s,p,m))all.push({p,m,t});}
+  return all.length?all[rnd(all.length)]:null;
+}
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act^='m-']");if(!el)return;
+  const a=el.dataset.act;
+  if(a==="m-classic")return showClassic();
+  if(a==="m-treino")return showClassicos();
+  if(a==="m-diff"){if(!teamOk())return showClassic();buildMine();const pool=ORDER(),k=pool[rnd(pool.length)];PICK="meu";return startGame("meu",k,el.dataset.d);}
+});
+/* ================== GRANDES CLÁSSICOS (modo Treino) ==================
+   Mapa do Brasil com os clássicos de cada estado. Toca no estado, escolhe o clássico,
+   lê a história e escolhe com qual lado jogar. Treino não vale essências. */
+const BR_OUT=[[-60.7,5.2],[-59.8,4.4],[-58.6,1.9],[-56.4,1.9],[-54.2,2.3],[-51.6,4.3],[-50.4,1.8],[-49.9,-0.3],[-48.4,-1],[-44.4,-2.4],[-41.5,-2.9],[-38.5,-3.7],[-36.3,-5],[-35.2,-5.5],[-34.8,-7.2],[-35.2,-9],[-37,-11],[-38.5,-13],[-39,-15.5],[-39.6,-18.1],[-40.3,-20.3],[-41,-22],[-43.2,-23],[-45,-23.7],[-46.3,-24],[-48,-25.3],[-48.6,-26.5],[-48.6,-28.4],[-49.8,-29.3],[-51,-30.6],[-52.1,-32.2],[-53.4,-33.7],[-53.6,-32.5],[-55.6,-30.9],[-57.6,-30.2],[-55.8,-28],[-54.2,-27.1],[-54.6,-25.6],[-54.3,-24],[-55.6,-23.9],[-57.9,-22.1],[-58.1,-19.8],[-57.5,-17.5],[-60.2,-16.3],[-60.4,-13.5],[-62,-12.5],[-65.4,-11],[-66.8,-9.8],[-69.5,-11],[-72.5,-9.5],[-73.9,-7.5],[-73,-5],[-70,-4.2],[-69.4,-1],[-69.9,1],[-67,2],[-64.2,2],[-64,4],[-60.7,5.2]];
+const brX=lon=>(lon+75)*10,brY=lat=>(6-lat)*10;
+const UFS={
+  SP:{n:"São Paulo",lon:-47.2,lat:-22.6},RJ:{n:"Rio de Janeiro",lon:-43.2,lat:-22.9},MG:{n:"Minas Gerais",lon:-44.2,lat:-19.2},
+  RS:{n:"Rio Grande do Sul",lon:-51.6,lat:-29.6},PR:{n:"Paraná",lon:-50.6,lat:-24.9},BA:{n:"Bahia",lon:-40.5,lat:-12.8}
+};
+const CLASSICOS=[
+  {uf:"SP",nome:"Derby Paulista",a:"cor",b:"pal",tx:"O maior clássico de São Paulo, disputado desde 1917. De um lado o Timão, o time do povo; do outro o antigo Palestra Itália, fundado por imigrantes italianos. Cidade parada e estádio dividido."},
+  {uf:"SP",nome:"Choque-Rei",a:"pal",b:"sao",tx:"Palmeiras e São Paulo, dois gigantes da capital que decidiram muitos Paulistões e Brasileirões. Jogo de muita tática e pouca margem de erro."},
+  {uf:"SP",nome:"Majestoso",a:"cor",b:"sao",tx:"Corinthians contra São Paulo, o clássico de nome nobre. A Fiel contra o Tricolor do Morumbi em finais históricas, inclusive de Libertadores."},
+  {uf:"SP",nome:"San-São",a:"san",b:"sao",tx:"Santos contra São Paulo, o clássico que ficou famoso na era de Pelé, quando o Peixe enchia o Morumbi e a Vila."},
+  {uf:"SP",nome:"Clássico da Saudade",a:"pal",b:"san",tx:"Lembra os anos 1960, quando a Academia do Palmeiras e o Santos de Pelé eram os melhores times do Brasil e se revezavam nos títulos."},
+  {uf:"SP",nome:"Clássico Alvinegro",a:"cor",b:"san",tx:"Preto e branco dos dois lados: o Timão da capital contra o Peixe do litoral, com muita história em finais de Paulistão."},
+  {uf:"SP",nome:"Duelo do Interior",a:"rbb",b:"mir",tx:"Não é um clássico antigo, mas é o encontro dos dois times do interior paulista na Série A: o Massa Bruta de Bragança contra o Leão de Mirassol."},
+  {uf:"RJ",nome:"Fla-Flu",a:"fla",b:"flu",tx:"Nasceu em 1912, quando jogadores do Fluminense saíram do clube e foram fundar o futebol do Flamengo. Nelson Rodrigues dizia: \"O Fla-Flu começou quarenta minutos antes do nada\"."},
+  {uf:"RJ",nome:"Clássico dos Milhões",a:"fla",b:"vas",tx:"As duas maiores torcidas do Rio frente a frente. Maracanã lotado, rubro-negro de um lado e cruz-maltino do outro."},
+  {uf:"RJ",nome:"Clássico Vovô",a:"bot",b:"flu",tx:"O clássico mais antigo do Rio, jogado desde o começo do século 20. Por isso o apelido de vovô dos clássicos cariocas."},
+  {uf:"RJ",nome:"Clássico da Rivalidade",a:"fla",b:"bot",tx:"Flamengo e Botafogo, vizinhos de bairro e de história, com decisões marcantes no Maracanã."},
+  {uf:"RJ",nome:"Clássico dos Gigantes",a:"vas",b:"flu",tx:"Vasco e Fluminense, dois gigantes cariocas com finais históricas de Campeonato Carioca."},
+  {uf:"RJ",nome:"Clássico da Amizade",a:"vas",b:"bot",tx:"Vasco e Botafogo, o clássico que ganhou o nome de amizade, mas dentro de campo ninguém alivia."},
+  {uf:"MG",nome:"Clássico Mineiro",a:"cam",b:"cru",tx:"Galo contra Raposa, o jogo que divide Belo Horizonte ao meio. Clássico de Mineirão cheio e muita provocação."},
+  {uf:"RS",nome:"Gre-Nal",a:"gre",b:"int",tx:"Disputado desde 1909, quando o Grêmio venceu o primeiro por 10 a 0. Hoje é um dos clássicos mais quentes e equilibrados do mundo."},
+  {uf:"PR",nome:"Atletiba",a:"cap",b:"ctb",tx:"O maior clássico do Paraná: Furacão contra Coxa em Curitiba, uma rivalidade de mais de cem anos."},
+  {uf:"BA",nome:"Ba-Vi",a:"bah",b:"vit",tx:"O maior clássico do Nordeste: Bahia contra Vitória em Salvador, com a Fonte Nova ou o Barradão pegando fogo."}
+];
+let CQ={uf:null,i:null};
+const LBL={SP:[6,34],RJ:[32,5],PR:[-34,5],RS:[-34,5]};
+const dotC=k=>{const c=CLUBS[k];return /^#(fff|ffffff|f[0-9a-f]f[0-9a-f]f[0-9a-f])$/i.test(c.c1)?c.c2:c.c1;};
+function brMap(){
+  const pts=BR_OUT.map(([x,y])=>`${brX(x).toFixed(0)},${brY(y).toFixed(0)}`).join(" ");
+  const pins=Object.entries(UFS).map(([k,u])=>{const n=CLASSICOS.filter(c=>c.uf===k).length,x=brX(u.lon),y=brY(u.lat),on=CQ.uf===k;
+    return `<g class="pin ${on?"on":""}" data-act="q-uf" data-uf="${k}" role="button" tabindex="0" aria-label="${u.n}: ${n} clássicos"><circle cx="${x}" cy="${y}" r="${on?20:16}"/><text x="${x}" y="${y+5}" text-anchor="middle">${n}</text><text class="uf" x="${x+(LBL[k]||[0,-24])[0]}" y="${y+(LBL[k]||[0,-24])[1]}" text-anchor="middle">${k}</text></g>`;}).join("");
+  return `<svg class="brmap" viewBox="0 0 420 405" role="img" aria-label="Mapa do Brasil com os clássicos"><polygon points="${pts}" class="br"/>${pins}</svg>`;
+}
+function showClassicos(){
+  G=null;ASK=null;TREINO=false;ensureShell();document.getElementById("screen").innerHTML="";
+  const list=CLASSICOS.map((c,i)=>[c,i]).filter(([c])=>!CQ.uf||c.uf===CQ.uf);
+  showOv(`<div class="dlg"><h2>🏋️ Grandes Clássicos</h2>
+  <p>O Brasil é cheio de clássico! Toque num estado do mapa pra ver os clássicos de lá. O treino não vale essências.</p>
+  <div class="mapwrap">${brMap()}</div>
+  <h3 class="sub">${CQ.uf?`${UFS[CQ.uf].n} <button type="button" class="chip" data-act="q-uf" data-uf="">Ver todos</button>`:"Todos os clássicos"}</h3>
+  <div class="qlist">${list.map(([c,i])=>`<button type="button" class="qc" data-act="q-pick" data-i="${i}" style="--c1:${dotC(c.a)};--c2:${dotC(c.b)}"><i></i><span><b>${c.nome}</b><small>${CLUBS[c.a].name} x ${CLUBS[c.b].name} · ${c.uf}</small></span></button>`).join("")}</div>
+  <div class="row"><button class="btn s" data-act="q-livre">Jogo livre (qualquer time)</button><button class="btn s" data-act="newgame">Voltar ao menu</button></div></div>`);
+}
+function showClassico(i){
+  const c=CLASSICOS[i],A=CLUBS[c.a],B=CLUBS[c.b];
+  showOv(`<div class="dlg"><h2>${c.nome}</h2>
+  <p><b style="color:var(--fg)">${A.name}</b> x <b style="color:var(--fg)">${B.name}</b> · ${UFS[c.uf].n}</p>
+  <p>${c.tx}</p>
+  <h3 class="sub">Com quem você joga?</h3>
+  <div class="modes">${[[c.a,c.b],[c.b,c.a]].map(([me,ai])=>`<button type="button" class="mode" data-act="q-play" data-me="${me}" data-ai="${ai}" style="border-left:6px solid ${CLUBS[me].c1}"><b>${CLUBS[me].name}</b><small>${CLUBS[me].coach.name}: ${CLUBS[me].coach.power}</small></button>`).join("")}</div>
+  <div class="row"><button class="btn s" data-act="m-treino">Voltar ao mapa</button></div></div>`);
+}
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act^='q-']");if(!el)return;
+  const a=el.dataset.act;
+  if(a==="q-uf"){CQ.uf=el.dataset.uf||null;return showClassicos();}
+  if(a==="q-pick")return showClassico(+el.dataset.i);
+  if(a==="q-livre"){TREINO=true;return showPick();}
+  if(a==="q-play"){PICK=el.dataset.me;return startGame(el.dataset.me,el.dataset.ai,"treino");}
+});
 
 /* ---- começo: volta pra partida salva, se tiver ---- */
 if(loadMatch()){
   ensureShell();render();
   if(G.phase==="play"&&!G.started)beginMatch();
   else toast("Partida recuperada",1100);
-}else showPick();
+}else if(!ACC)showLogin();else showPick();
 accSyncAtStart();
 </script>
 
