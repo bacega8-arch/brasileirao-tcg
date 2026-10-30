@@ -1877,7 +1877,7 @@ function colLoad(){
   return s;
 }
 let COL=colLoad();
-function colSave(){try{localStorage.setItem(COL_KEY,JSON.stringify(COL));}catch(e){}}
+function colSave(){COL.updated=Date.now();try{localStorage.setItem(COL_KEY,JSON.stringify(COL));}catch(e){}if(typeof accPush==="function")accPush();}
 const ALL_PLAYERS=Object.values(DEFS).filter(d=>d.kind==="player");
 const owned=k=>!!COL.cards[k];
 const ownedList=()=>ALL_PLAYERS.filter(d=>owned(d.key));
@@ -2042,6 +2042,7 @@ const BK={ready:false,uid:null,
   },
   ref(p){return this.db.ref(p);},
   set(p,v){return this.ref(p).set(v);},
+  async get(p){return (await this.ref(p).once("value")).val();},
   push(p,v){return this.ref(p).push(v);},
   remove(p){return this.ref(p).remove();},
   onLeave(p,v){const d=this.ref(p).onDisconnect();return v===undefined?d.remove():d.set(v);},
@@ -2059,8 +2060,10 @@ function showOnline(msg){
   if(!ON_TEAM||(ON_TEAM==="meu"&&!teamOk()))ON_TEAM=teamOk()?"meu":"cor";
   showOv(`<div class="dlg"><h2>Jogar online</h2>
   ${msg?`<p class="warn">${msg}</p>`:""}
-  <p>Seu nome de jogador (é o que seus amigos vão ver):</p>
-  <input id="nmIn" class="inp" maxlength="16" placeholder="Ex.: Leo do Verdão" value="${NAME.replace(/"/g,"&quot;")}">
+  ${ACC?`<p>Você está na conta <b style="color:var(--fg)">${esc(ACC.nick)}</b>. Suas cartas e essências ficam salvas na nuvem. <button type="button" class="chip" data-act="o-logout">Trocar de conta</button></p>`:`
+  <p>Seu nick (é o que seus amigos vão ver) e um código de 4 números. Com eles você entra na sua conta em qualquer celular, e suas cartas ficam salvas.</p>
+  <input id="nmIn" class="inp" maxlength="16" placeholder="Nick, ex.: Leo do Verdão" value="${NAME.replace(/"/g,"&quot;")}">
+  <input id="pinIn" class="inp" style="margin-top:6px" inputmode="numeric" maxlength="4" placeholder="Código de 4 números" type="password">`}
   <h3 class="sub">Com qual time?</h3>
   <div class="chips">${teamOk()?`<button type="button" class="chip ${ON_TEAM==="meu"?"on":""}" data-act="o-team" data-club="meu">⭐ ${COL.name}</button>`:""}${ORDER().map(k=>`<button type="button" class="chip ${ON_TEAM===k?"on":""}" data-act="o-team" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
   <p style="font-size:12px">Time escolhido: <b style="color:var(--fg)">${teamLabel(ON_TEAM)}</b></p>
@@ -2070,7 +2073,13 @@ const readName=()=>{const el=document.getElementById("nmIn");if(el){NAME=el.valu
 
 /* ---- saguão ---- */
 async function enterLobby(){
-  if(!readName())return showOnline("Coloque seu nome primeiro.");
+  if(!ACC){
+    const pinEl=document.getElementById("pinIn"),pin=pinEl?pinEl.value.trim():"";
+    if(!readName())return showOnline("Coloque seu nick primeiro.");
+    if(!/^\d{4}$/.test(pin))return showOnline("O código precisa ter 4 números.");
+    showOv(`<div class="dlg"><h2>Conectando…</h2><p>Entrando na sua conta.</p></div>`);
+    try{await accLogin(NAME,pin);}catch(e){console.error(e);return showOnline(e.message==="dono"?"Esse nick já tem dono e o código não bate. Confira o código ou escolha outro nick.":e.message==="semconfig"?"O online ainda não foi ligado: falta configurar o Firebase.":`Não consegui conectar. Confira a internet e tente de novo. (${esc(e.code||e.message||"erro")})`);}
+  }
   showOv(`<div class="dlg"><h2>Conectando…</h2><p>Entrando no saguão.</p></div>`);
   try{await BK.init();}catch(e){console.error(e);return showOnline(e.message==="semconfig"?"O online ainda não foi ligado: falta configurar o Firebase.":`Não consegui conectar. Confira a internet e tente de novo. (${esc(e.code||e.message||"erro")})`);}
   offAll();LOBBY={};
@@ -2258,6 +2267,7 @@ document.addEventListener("click",e=>{
   const el=e.target.closest("[data-act^='o-']");if(!el)return;
   const a=el.dataset.act;
   if(a==="o-home")return showOnline();
+  if(a==="o-logout"){accLogout();return showOnline();}
   if(a==="o-team"){readName();ON_TEAM=el.dataset.club;return showOnline();}
   if(a==="o-enter")return enterLobby();
   if(a==="o-back"){NET=null;return drawLobby();}
@@ -2269,12 +2279,66 @@ document.addEventListener("click",e=>{
   if(a==="o-again"){G=null;return enterLobby();}
 });
 
+/* ---- conta pelo nome: nick + código de 4 números, coleção salva na nuvem ----
+   No banco fica players/<nick>/<código embaralhado>: quem não sabe o código não acha os dados,
+   e ninguém consegue pegar um nick que já tem dono. */
+const ACC_KEY="brasileirao-conta";
+let ACC=null;try{ACC=JSON.parse(localStorage.getItem(ACC_KEY));}catch(e){}
+const nickKey=n=>n.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24);
+function sha256hex(str){
+  const K=[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298];
+  const b=Array.from(new TextEncoder().encode(str)),l=b.length*8;b.push(128);while(b.length%64!==56)b.push(0);
+  for(let i=7;i>=0;i--)b.push(Math.floor(l/2**(i*8))&255);
+  let H=[1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225];
+  const r=(x,n)=>(x>>>n)|(x<<(32-n));
+  for(let o=0;o<b.length;o+=64){
+    const w=[];for(let i=0;i<16;i++)w[i]=(b[o+i*4]<<24)|(b[o+i*4+1]<<16)|(b[o+i*4+2]<<8)|b[o+i*4+3];
+    for(let i=16;i<64;i++){const s0=r(w[i-15],7)^r(w[i-15],18)^(w[i-15]>>>3),s1=r(w[i-2],17)^r(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0;}
+    let [a,bb,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+w[i])|0,t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&c)^(bb&c)))|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=bb;bb=a;a=(t1+t2)|0;}
+    H=H.map((v,i)=>(v+[a,bb,c,d,e,f,g,h][i])|0);
+  }
+  return H.map(v=>(v>>>0).toString(16).padStart(8,"0")).join("");
+}
+const accPath=a=>`players/${a.key}/${a.h}`;
+async function accLogin(nick,pin){
+  const key=nickKey(nick);if(!key)throw new Error("nick");
+  if(!/^\d{4}$/.test(pin))throw new Error("pin");
+  const a={nick,key,h:sha256hex(`${key}:${pin}:brasileirao-cards`)};
+  await BK.init();
+  const cloud=await BK.get(accPath(a));
+  if(cloud&&cloud.j){const c=JSON.parse(cloud.j);if((c.updated||0)>(COL.updated||0)||!COL.updated){COL=Object.assign(colLoadFrom(c));try{localStorage.setItem(COL_KEY,JSON.stringify(COL));}catch(e){}}}
+  else{try{await BK.set(accPath(a),{nick,u:Date.now(),j:JSON.stringify(COL)});}catch(e){throw new Error(/permission/i.test(String(e.code||e.message))?"dono":(e.code||e.message||"erro"));}}
+  ACC=a;try{localStorage.setItem(ACC_KEY,JSON.stringify(a));}catch(e){}
+  NAME=nick;try{localStorage.setItem(NAME_KEY,NAME);}catch(e){}
+  accPush();
+}
+function colLoadFrom(s){
+  s.team=(s.team||[]).filter(k=>DEFS[k]&&s.cards&&s.cards[k]);
+  for(const k of Object.keys(s.cards||{}))if(!DEFS[k])delete s.cards[k];
+  return s;
+}
+let accT=null;
+function accPush(){
+  if(!ACC)return;clearTimeout(accT);
+  accT=setTimeout(async()=>{try{await BK.init();await BK.set(accPath(ACC),{nick:ACC.nick,u:Date.now(),j:JSON.stringify(COL)});}catch(e){}},1500);
+}
+async function accSyncAtStart(){
+  if(!ACC||!FB_CONFIG&&!window.__MOCKBK)return;
+  try{await BK.init();const cloud=await BK.get(accPath(ACC));
+    if(cloud&&cloud.j){const c=JSON.parse(cloud.j);if((c.updated||0)>(COL.updated||0)){COL=colLoadFrom(c);try{localStorage.setItem(COL_KEY,JSON.stringify(COL));}catch(e){}if(!G&&document.querySelector(".ov .dlg"))showPick();return;}}
+    accPush();
+  }catch(e){}
+}
+function accLogout(){ACC=null;try{localStorage.removeItem(ACC_KEY);}catch(e){}}
+
 /* ---- começo: volta pra partida salva, se tiver ---- */
 if(loadMatch()){
   ensureShell();render();
   if(G.phase==="play"&&!G.started)beginMatch();
   else toast("Partida recuperada",1100);
 }else showPick();
+accSyncAtStart();
 </script>
 
 <script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
