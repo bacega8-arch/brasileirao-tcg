@@ -206,6 +206,8 @@ html,body{overscroll-behavior:none}
 .chip.on{background:var(--gold);color:#231A00}
 .warn{color:var(--pink)!important;font-size:12px}.okk{color:var(--mine)!important;font-weight:700}
 .btn:disabled{opacity:.45}
+.fbar{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:8px;border-radius:12px;background:#0A1611;border:1px solid var(--line)}
+.fbar .chips{margin:2px 0}.chips.scr{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.chips.scr .chip{flex:none}
 .inp{width:100%;font:inherit;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#0A1611;color:var(--fg)}
 .plist{display:flex;flex-direction:column;gap:6px;margin:6px 0}
 .pl{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
@@ -1942,7 +1944,7 @@ function matchReward(meGoals,res){
 }
 
 /* ---- telas ---- */
-let CV={role:"all",club:null,back:"home",pack:null};
+let CV={role:"all",club:null,back:"home",pack:null,grid:null,f:{q:"",role:"all",club:"all",star:false,own:"all",sort:"pos"}};
 const essHTML=()=>isDono()?`<div class="essbar"><span>👑 <b>Modo dono</b></span><span>💠 <b>∞</b> essências</span><span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`:`<div class="essbar"><span>💠 <b>${COL.ess}</b> essências</span>${COL.packs?`<span>🎁 <b>${COL.packs}</b> grátis</span>`:""}<span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`;
 const colCard=(d,o={})=>`<button type="button" class="hc player f-${frameOf(d)} ${isStar(d)?"star":""} ${o.cls||""}" data-act="${o.act||"c-det"}" data-key="${d.key}"><span class="k">${ROLEIC[d.role]} ${CLUBS[d.club].code}</span><div class="mini">${chibi(d)}</div><span class="nm">${d.name}</span>${o.badge?`<span class="bdg ${o.bc||""}">${o.badge}</span>`:""}</button>`;
 function showCol(){
@@ -1966,22 +1968,47 @@ function showPack(){
   ${all?`<p>${got.filter(x=>!x.dup).length} cartas novas${got.some(x=>isStar(x.d))?" · veio Craque! ✨":""}.</p>`:""}
   <div class="row">${all?`<button class="btn p" data-act="c-open" ${isDono()||COL.packs>0||COL.ess>=PACK_COST?"":"disabled"}>Abrir outro</button><button class="btn s" data-act="c-home">Coleção</button>`:`<button class="btn p" data-act="c-flipall">Virar todas</button>`}</div></div>`);
 }
+/* ---- filtros das cartas: busca pelo nome, posição, clube, só craques, ordem ---- */
+const FROLES=[["all","Todos"],["D","🛡️ Tanque"],["M","✨ Suporte"],["A","⚔️ Carry"]];
+const GRID_MAX=120;
+const normTx=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const forcaOf=d=>d.hp+Math.max(...d.moves.map(m=>m.p+(m.coin||0)/2))*2+(isStar(d)?40:0);
+const fchip=(k,v,t,on,c1)=>`<button type="button" class="chip ${(on!=null?on:CV.f[k]===v)?"on":""}" data-act="c-f" data-k="${k}" data-v="${v}" ${c1?`style="--c1:${c1}"`:""}>${t}</button>`;
+function filterBar(album){
+  const f=CV.f;
+  return `<div class="fbar">
+  <input id="fq" class="inp" type="search" autocomplete="off" placeholder="🔎 Buscar jogador pelo nome" value="${String(f.q).replace(/"/g,"&quot;")}">
+  <div class="chips">${FROLES.map(([k,t])=>fchip("role",k,t)).join("")}${fchip("star",f.star?"0":"1","✨ Só craques",f.star)}</div>
+  <div class="chips">${fchip("sort","pos","Por posição")}${fchip("sort","forca","Mais fortes")}${fchip("sort","club","Por clube")}${album?fchip("own","all","Todas")+fchip("own","have","Tenho")+fchip("own","miss","Faltam"):""}</div>
+  <div class="chips scr">${fchip("club","all","Todos os clubes")}${ORDER().map(k=>fchip("club",k,CLUBS[k].code,null,CLUBS[k].c1)).join("")}</div>
+  ${f.q||f.role!=="all"||f.club!=="all"||f.star||(album&&f.own!=="all")?`<button type="button" class="chip" data-act="c-fclear">✖ Limpar filtros</button>`:""}</div>`;
+}
+function applyF(list,album){
+  const f=CV.f,q=normTx(f.q.trim()),P=d=>"DMA".indexOf(d.pos);
+  const r=list.filter(d=>(f.role==="all"||d.pos===f.role)&&(f.club==="all"||d.club===f.club)&&(!f.star||isStar(d))&&(!q||normTx(d.name).includes(q))&&(!album||f.own==="all"||(f.own==="have")===owned(d.key)));
+  r.sort(f.sort==="forca"?(a,b)=>forcaOf(b)-forcaOf(a):f.sort==="club"?(a,b)=>a.club.localeCompare(b.club)||P(a)-P(b)||a.num-b.num:(a,b)=>P(a)-P(b)||a.club.localeCompare(b.club)||a.num-b.num);
+  return r;
+}
+const missCard=d=>`<div class="hc miss"><span class="k">${ROLEIC[d.role]} ${CLUBS[d.club].code}</span><span class="q">?</span><span class="nm">#${d.num}</span></div>`;
+function albumGrid(){
+  const list=applyF(ALL_PLAYERS,true),have=list.filter(d=>owned(d.key)).length;
+  return `<div id="cgrid"><p>${list.length} cartas · você tem ${have}${list.length>GRID_MAX?` · mostrando ${GRID_MAX}, use os filtros pra achar o resto`:""}</p>
+  <div class="cg">${list.slice(0,GRID_MAX).map(d=>owned(d.key)?colCard(d,{badge:COL.cards[d.key]>1?`x${COL.cards[d.key]}`:"",bc:"dup"}):missCard(d)).join("")||"<p>Nenhuma carta com esses filtros.</p>"}</div></div>`;
+}
+function teamGrid(){
+  const list=applyF(ownedList().filter(d=>!COL.team.includes(d.key)),false);
+  return `<div id="cgrid"><p>${list.length} cartas${list.length>GRID_MAX?` · mostrando ${GRID_MAX}`:""}</p>
+  <div class="cg">${list.length?list.slice(0,GRID_MAX).map(d=>colCard(d,{act:"c-add",cls:COL.team.length>=TEAM_SIZE?"dim":""})).join(""):`<p>Nada aqui. Mude os filtros ou abra pacotes pra ganhar mais jogadores.</p>`}</div></div>`;
+}
 function showAlbum(){
-  CV.back="album";
-  const club=CV.club||ORDER()[0];CV.club=club;
-  const list=ALL_PLAYERS.filter(d=>d.club===club).sort((a,b)=>"DMA".indexOf(a.pos)-"DMA".indexOf(b.pos)||a.num-b.num);
-  const have=list.filter(d=>owned(d.key)).length;
-  showOv(`<div class="dlg"><h2>Álbum</h2>${essHTML()}
-  <div class="chips">${ORDER().map(k=>`<button type="button" class="chip ${k===club?"on":""}" data-act="c-club" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
-  <p><b style="color:var(--fg)">${CLUBS[club].name}</b>: ${have}/${list.length}</p>
-  <div class="cg">${list.map(d=>owned(d.key)?colCard(d,{badge:COL.cards[d.key]>1?`x${COL.cards[d.key]}`:"",bc:"dup"}):`<div class="hc miss"><span class="k">${ROLEIC[d.role]}</span><span class="q">?</span><span class="nm">#${d.num}</span></div>`).join("")}</div>
+  CV.back="album";CV.grid=albumGrid;
+  showOv(`<div class="dlg"><h2>Álbum</h2>${essHTML()}${filterBar(true)}${albumGrid()}
   <div class="row"><button class="btn s" data-act="c-home">Voltar</button></div></div>`);
 }
 function showTeam(){
-  CV.back="team";
+  CV.back="team";CV.grid=teamGrid;
   const n=roleCount(),iss=teamIssues(),cc=coachClub();
   const mine=teamDefs().sort((a,b)=>"DMA".indexOf(a.pos)-"DMA".indexOf(b.pos));
-  const pool=ownedList().filter(d=>!COL.team.includes(d.key)&&(CV.role==="all"||d.pos===CV.role)).sort((a,b)=>"DMA".indexOf(a.pos)-"DMA".indexOf(b.pos)||a.club.localeCompare(b.club));
   showOv(`<div class="dlg"><h2>Montar time roubado</h2>
   <p>${COL.team.length}/${TEAM_SIZE} · 🛡️${n.D}/${TEAM_TIP.D} ✨${n.M}/${TEAM_TIP.M} ⚔️${n.A}/${TEAM_TIP.A} <small>(sugestão)</small></p>
   ${iss.length?`<p class="warn">${iss.join(" ")}</p>`:`<p class="okk">Time pronto pra jogar!</p>`}
@@ -1990,10 +2017,15 @@ function showTeam(){
   <h3 class="sub">No time <small>(toque pra tirar)</small></h3>
   <div class="cg">${mine.length?mine.map(d=>colCard(d,{act:"c-rem"})).join(""):`<p>Ninguém ainda. Toque nas cartas abaixo.</p>`}</div>
   <h3 class="sub">Sua coleção <small>(toque pra pôr)</small></h3>
-  <div class="chips">${[["all","Todos"],["D","🛡️ Tanque"],["M","✨ Suporte"],["A","⚔️ Carry"]].map(([k,t])=>`<button type="button" class="chip ${CV.role===k?"on":""}" data-act="c-role" data-r="${k}">${t}</button>`).join("")}</div>
-  <div class="cg">${pool.length?pool.map(d=>colCard(d,{act:"c-add",cls:COL.team.length>=TEAM_SIZE?"dim":""})).join(""):`<p>Nada aqui. Abra pacotes pra ganhar mais jogadores.</p>`}</div>
+  ${filterBar(false)}${teamGrid()}
   <div class="row"><button class="btn s" data-act="c-auto">Completar sozinho</button><button class="btn s" data-act="c-clear">Limpar</button><button class="btn s" data-act="c-home">Voltar</button>${teamOk()?`<button class="btn p" data-act="c-play">Jogar</button>`:""}</div></div>`);
 }
+/* digitar na busca só troca a grade, pra não fechar o teclado */
+document.addEventListener("input",e=>{
+  if(e.target.id!=="fq"||!CV.grid)return;
+  CV.f.q=e.target.value;const g=document.getElementById("cgrid");if(g)g.outerHTML=CV.grid();
+});
+function keepScroll(fn){const d=document.querySelector(".ov .dlg"),y=d?d.scrollTop:0;fn();const d2=document.querySelector(".ov .dlg");if(d2)d2.scrollTop=y;}
 function showDet(k){
   const d=DEFS[k];
   showOv(`<div class="dlg"><h2>${d.name}</h2><p>${CLUBS[d.club].name} · ${rarName(d)}${isStar(d)?" ✨":""}${d.from?` · evolui de ${DEFS[d.from].name} (${DEFS[d.from].stage})`:""}${owned(k)?` · você tem ${COL.cards[k]}`:""}</p>
@@ -2010,14 +2042,16 @@ document.addEventListener("click",e=>{
   if(a==="c-flip"){CV.pack[+el.dataset.i].up=true;return showPack();}
   if(a==="c-flipall"){CV.pack.forEach(x=>x.up=true);return showPack();}
   if(a==="c-album")return showAlbum();
+  if(a==="c-f"){const k=el.dataset.k,v=el.dataset.v;CV.f[k]=k==="star"?v==="1":v;return keepScroll(CV.back==="team"?showTeam:showAlbum);}
+  if(a==="c-fclear"){Object.assign(CV.f,{q:"",role:"all",club:"all",star:false,own:"all"});return keepScroll(CV.back==="team"?showTeam:showAlbum);}
   if(a==="c-all"){if(isDono()){ALL_PLAYERS.forEach(d=>{COL.cards[d.key]=Math.max(1,COL.cards[d.key]||0);});colSave();}return showCol();}
   if(a==="c-club"){CV.club=el.dataset.club;return showAlbum();}
   if(a==="c-det")return showDet(el.dataset.key);
   if(a==="c-back")return colBack();
   if(a==="c-team")return showTeam();
   if(a==="c-role"){CV.role=el.dataset.r;return showTeam();}
-  if(a==="c-add"){if(COL.team.length<TEAM_SIZE&&!COL.team.includes(el.dataset.key)){COL.team.push(el.dataset.key);colSave();}return showTeam();}
-  if(a==="c-rem"){COL.team=COL.team.filter(k=>k!==el.dataset.key);colSave();return showTeam();}
+  if(a==="c-add"){if(COL.team.length<TEAM_SIZE&&!COL.team.includes(el.dataset.key)){COL.team.push(el.dataset.key);colSave();}return keepScroll(showTeam);}
+  if(a==="c-rem"){COL.team=COL.team.filter(k=>k!==el.dataset.key);colSave();return keepScroll(showTeam);}
   if(a==="c-coach"){COL.coach=el.dataset.club;colSave();return showTeam();}
   if(a==="c-auto"){autoTeam();return showTeam();}
   if(a==="c-clear"){COL.team=[];colSave();return showTeam();}
