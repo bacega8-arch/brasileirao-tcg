@@ -1614,7 +1614,7 @@ async function finishMatch(){
     <p style="font-size:18px;color:var(--fg)">${score()}</p>
     ${pens?`<p>Nos pênaltis: ${pens.me} x ${pens.ai}</p><p style="font-size:12px">${pens.seq.join(" · ")}</p>`:""}
     ${G.diff==="treino"?`<p>🏋️ Treino: não vale essências. Jogue o Clássico pra ganhar!</p>`:`<div class="essbar"><span>💠 +<b>${ess}</b> essências</span><span>Total: ${COL.ess}</span>${DIFF[G.diff]&&!G.online?`<span>${DIFF[G.diff].ic} ${DIFF[G.diff].n}</span>`:""}</div>`}
-    <div class="row"><button class="btn p" data-act="${G.diff==="treino"||G.online?"newgame":"m-classic"}">Jogar de novo</button>${G.diff==="treino"&&!G.online?`<button class="btn s" data-act="m-treino">Outro clássico</button>`:""}<button class="btn s" data-act="${G.online?"c-home":"newgame"}">${G.online?"Pacotes":"Menu"}</button><button class="btn s" data-act="close">Ver o campo</button></div></div>`);
+    <div class="row"><button class="btn p" data-act="${G.diff==="treino"||G.online?"newgame":G.diff==="normal"?"m-normal":"m-classic"}">Jogar de novo</button>${G.diff==="treino"&&!G.online?`<button class="btn s" data-act="m-treino">Outro clássico</button>`:""}<button class="btn s" data-act="${G.online?"c-home":"newgame"}">${G.online?"Pacotes":"Menu"}</button><button class="btn s" data-act="close">Ver o campo</button></div></div>`);
 }
 
 /* ================== TELA ================== */
@@ -1794,9 +1794,9 @@ document.addEventListener("click",async e=>{
   if(el.classList.contains("sheetWrap")&&e.target.closest("[data-stop]"))return;
   const a=el.dataset.act;
   if(a==="pick"){PICK=el.dataset.club;showPick(true);return;}
-  if(a==="rival"){const pool=ORDER().filter(x=>x!==PICK),k=el.dataset.club==="rnd"?pool[rnd(pool.length)]:el.dataset.club;startGame(PICK,k,TREINO?"treino":"medio");return;}
+  if(a==="rival"){const pool=ORDER().filter(x=>x!==PICK),k=el.dataset.club==="rnd"?pool[rnd(pool.length)]:el.dataset.club;startGame(PICK,k,TREINO?"treino":NORMAL?"normal":"medio");return;}
   if(a==="lore"){showLore(el.dataset.club);return;}
-  if(a==="newgame"){if(NET)netLeave(!!(G&&G.over));clearMatch();PICK=null;TREINO=false;showPick();return;}
+  if(a==="newgame"){if(NET)netLeave(!!(G&&G.over));clearMatch();PICK=null;TREINO=false;NORMAL=false;showPick();return;}
   if(a==="close"){closeOv();return;}
   if(a==="kick"){closeOv();if(G&&G.phase==="play"&&G.half===0&&!G.started){G.started=true;startTurn("me",true);}return;}
   if(a==="back"){showPick(!!PICK);return;}
@@ -1843,12 +1843,12 @@ function showRules(){showOv(`<div class="dlg">${rulesHTML()}<div class="row"><bu
 let PICK=null;
 const ORDER=()=>Object.keys(CLUBS).filter(k=>k!=="meu").sort((a,b)=>CLUBS[a].name.localeCompare(CLUBS[b].name,"pt"));
 function showPick(rival){
-  if(!rival&&!TREINO)return showMenu();
+  if(!rival&&!TREINO&&!NORMAL)return showMenu();
   G=null;ASK=null;if(!rival)PICK=null;
   ensureShell();document.getElementById("screen").innerHTML="";
   const list=ORDER().filter(k=>k!==PICK);
-  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"🏋️ Treino"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha um time pronto pra treinar. Toque no ℹ️ pra ler a história e a mecânica do clube. O treino não vale essências."}</p>
-  ${rival?"":`<div class="row" style="margin:0 0 8px"><button class="btn s" data-act="m-treino">Voltar aos clássicos</button></div>`}
+  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":NORMAL?"⚽ Jogo normal":"🏋️ Treino"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:NORMAL?`Escolha um time pronto e jogue contra o computador. Toque no ℹ️ pra ler a história e a mecânica do clube. Vitória vale +${DIFF.facil.rew.win} 💠.`:"Escolha um time pronto pra treinar. Toque no ℹ️ pra ler a história e a mecânica do clube. O treino não vale essências."}</p>
+  ${rival?"":`<div class="row" style="margin:0 0 8px"><button class="btn s" data-act="${NORMAL?"newgame":"m-treino"}">${NORMAL?"Voltar ao menu":"Voltar aos clássicos"}</button></div>`}
   ${rival?`<div class="row" style="margin:8px 0"><button class="btn p" data-act="rival" data-club="rnd">🎲 Sortear rival</button><button class="btn s" data-act="newgame">Voltar</button></div>`:""}
   <div class="clubs">${list.map(k=>`<div class="cl" style="--c1:${CLUBS[k].c1};--c2:${CLUBS[k].c2}"><button class="go" data-act="${rival?"rival":"pick"}" data-club="${k}"><i></i><b>${CLUBS[k].name}</b><small>${CLUBS[k].coach.power}</small></button><button class="inf" data-act="lore" data-club="${k}" aria-label="História do ${CLUBS[k].name}">ℹ️</button></div>`).join("")}</div>
   </div>`);
@@ -1964,7 +1964,7 @@ function buildMine(){
 /* ---- prêmio no fim do jogo ---- */
 function matchReward(meGoals,res){
   if(G&&G.diff==="treino")return 0;
-  const R=(DIFF[G&&G.diff]||DIFF.medio).rew,ess=R[res]+R.goal*meGoals;
+  const R=(G&&G.diff==="normal"?DIFF.facil:DIFF[G&&G.diff]||DIFF.medio).rew,ess=R[res]+R.goal*meGoals;
   COL.ess+=ess;COL.stats[res==="win"?"w":res==="draw"?"d":"l"]++;colSave();
   return ess;
 }
@@ -2418,7 +2418,7 @@ function accLogout(){ACC=null;try{localStorage.removeItem(ACC_KEY);}catch(e){}}
 /* ================== MODOS ==================
    Clássico: seu time roubado contra o computador (fácil, médio, difícil), vale essências.
    Treino: qualquer time pronto, só pra testar, não vale essências. */
-let TREINO=false;
+let TREINO=false,NORMAL=false;
 const DIFF={
   facil:{n:"Fácil",ic:"🟢",tx:"O computador erra bastante e quase não usa cartas de resposta.",rew:{win:60,draw:30,loss:15,goal:5}},
   medio:{n:"Médio",ic:"🟡",tx:"O computador joga direitinho.",rew:{win:100,draw:50,loss:25,goal:10}},
@@ -2426,10 +2426,11 @@ const DIFF={
 };
 const accLine=()=>ACC?`<p style="font-size:13px">👤 <b style="color:var(--fg)">${esc(ACC.nick)}</b> · cartas salvas na nuvem <button type="button" class="chip" data-act="o-logout">Sair</button></p>`:`<p style="font-size:13px">👤 Jogando sem conta <button type="button" class="chip" data-act="o-logout">Entrar</button></p>`;
 function showMenu(){
-  G=null;ASK=null;PICK=null;TREINO=false;ensureShell();document.getElementById("screen").innerHTML="";
+  G=null;ASK=null;PICK=null;TREINO=false;NORMAL=false;ensureShell();document.getElementById("screen").innerHTML="";
   showOv(`<div class="dlg"><h2>Brasileirão Cards</h2>${accLine()}${essHTML()}
   <div class="modes">
     <button type="button" class="mode hi" data-act="m-classic"><b>⚔️ Clássico</b><small>Seu time roubado contra o computador: fácil, médio ou difícil. Vale essências!</small></button>
+    <button type="button" class="mode" data-act="m-normal"><b>⚽ Jogo normal</b><small>Escolha qualquer time pronto e jogue contra o computador. Não precisa de conta nem de pacotes.</small></button>
     <button type="button" class="mode" data-act="o-home"><b>🌐 Online</b><small>Desafie seus amigos que estiverem online.</small></button>
     <button type="button" class="mode" data-act="c-home"><b>🎴 Pacotes e coleção</b><small>Abra pacotes, veja o álbum e monte seu time.</small></button>
     <button type="button" class="mode" data-act="m-treino"><b>🏋️ Treino: Grandes Clássicos</b><small>Mapa do Brasil com os clássicos e a história de cada um. Não vale essências.</small></button>
@@ -2460,6 +2461,7 @@ document.addEventListener("click",e=>{
   const a=el.dataset.act;
   if(a==="m-classic")return showClassic();
   if(a==="m-treino")return showClassicos();
+  if(a==="m-normal"){TREINO=false;NORMAL=true;return showPick();}
   if(a==="m-diff"){if(!teamOk())return showClassic();buildMine();const pool=ORDER(),k=pool[rnd(pool.length)];PICK="meu";return startGame("meu",k,el.dataset.d);}
 });
 /* ================== GRANDES CLÁSSICOS (modo Treino) ==================
@@ -2523,7 +2525,7 @@ document.addEventListener("click",e=>{
   const a=el.dataset.act;
   if(a==="q-uf"){CQ.uf=el.dataset.uf||null;return showClassicos();}
   if(a==="q-pick")return showClassico(+el.dataset.i);
-  if(a==="q-livre"){TREINO=true;return showPick();}
+  if(a==="q-livre"){TREINO=true;NORMAL=false;return showPick();}
   if(a==="q-play"){PICK=el.dataset.me;return startGame(el.dataset.me,el.dataset.ai,"treino");}
 });
 
