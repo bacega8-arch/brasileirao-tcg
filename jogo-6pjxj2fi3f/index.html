@@ -1209,6 +1209,14 @@ for(const c of Object.values(ArteCartoon.clubs)){
   DECKS[c.id]={players:pick,events:["massagem","escanteio","caicai","var",coin?"mandrake":"lancamento",h%2?"chuva":"caldeirao","diretoria"]};
 }
 
+/* Craques dos outros 18 clubes (2 por clube): viram Ídolo, com +20 de vida e +10 no ataque.
+   São os "✨ Craques" raros dos pacotes, junto com os Ídolos de Palmeiras e Flamengo. */
+const CRAQUES=["cap-viveros","cap-zapelli","cam-bernard","cam-fred","bah-evertonribeiro","bah-willianjose","bot-danilo","bot-alextelles",
+  "rbb-sasha","rbb-capixaba","cha-bolasie","cha-giovanni","cor-memphis","cor-yuri","ctb-brenolopes","ctb-josue","cru-gerson","cru-kaiojorge","cru-matheuspereira",
+  "flu-thiagosilva","flu-hulk","gre-braithwaite","gre-kannemann","int-alanpatrick","int-carbonero","mir-reinaldo","mir-negueba",
+  "rem-pikachu","rem-vitorbueno","san-neymar","san-gabigol","sao-calleri","sao-lucas","vas-thiagomendes","vas-nuno","vit-marinho","vit-pato"];
+for(const k of CRAQUES){const d=DEFS[k];if(!d||d.stage==="Ídolo")continue;d.stage="Ídolo";d.hp+=20;d.moves.forEach(m=>{m.p+=10;});}
+
 /* ================== ARTE CARTOON ==================
    O desenho vem do módulo ArteCartoon (thread "Arte das cartas"), colado no começo da página.
    Aqui só recortamos o busto pra mostrar o rosto inteiro nas cartas pequenas. */
