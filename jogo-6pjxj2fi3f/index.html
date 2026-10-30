@@ -199,6 +199,9 @@ html,body{overscroll-behavior:none}
 .flipin{animation:flipin .45s ease-out}
 @keyframes flipin{from{transform:rotateY(90deg) scale(.9)}to{transform:none}}
 .hc{position:relative}
+.hc.col{height:108px}
+.hc .stt{font-size:9px;font-weight:800;color:#2A1F45;background:rgba(255,255,255,.75);border-radius:5px;padding:0 3px;white-space:nowrap}
+.hc .inf{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--panel);border:1px solid var(--gold);display:grid;place-items:center;font-size:11px;z-index:2}
 .hc.star{box-shadow:0 0 0 2px var(--gold),0 0 14px rgba(255,216,77,.7)}
 .hc .bdg{position:absolute;top:-6px;right:-6px;font-size:9px;font-weight:800;border-radius:8px;padding:1px 5px;background:var(--mine);color:#002B12;font-family:var(--f-body)}
 .hc .bdg.dup{background:var(--gold);color:#231A00}
@@ -2187,7 +2190,10 @@ function matchReward(meGoals,res){
 /* ---- telas ---- */
 let CV={role:"all",club:null,back:"home",pack:null,grid:null,f:{q:"",role:"all",club:"all",star:false,own:"all",sort:"pos"}};
 const essHTML=()=>isDono()?`<div class="essbar"><span>👑 <b>Modo dono</b></span><span>💠 <b>∞</b> essências</span><span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`:`<div class="essbar"><span>💠 <b>${COL.ess}</b> essências</span>${COL.packs?`<span>🎁 <b>${COL.packs}</b> grátis</span>`:""}<span>🃏 ${ownedList().length}/${ALL_PLAYERS.length}</span></div>`;
-const colCard=(d,o={})=>`<button type="button" class="hc player f-${frameOf(d)} ${isStar(d)?"star":""} ${o.cls||""}" data-act="${o.act||"c-det"}" data-key="${d.key}"><span class="k">${ROLEIC[d.role]} ${CLUBS[d.club].code}</span><div class="mini">${chibi(d)}</div><span class="nm">${d.name}</span>${o.badge?`<span class="bdg ${o.bc||""}">${o.badge}</span>`:""}</button>`;
+/* resumo pra escolher: vida e o ataque mais forte (tanque mostra o escudo) */
+const statLine=d=>{const a=d.moves.filter(m=>m.kind==="dmg").reduce((x,m)=>Math.max(x,m.p),0),sh=d.moves.filter(m=>m.shield).reduce((x,m)=>Math.max(x,m.shield),0);
+  return `❤️${d.hp} ${d.role==="T"?`🛡️${sh}`:`⚔️${a}`}`;};
+const colCard=(d,o={})=>`<button type="button" class="hc col player f-${frameOf(d)} ${isStar(d)?"star":""} ${o.cls||""}" data-act="${o.act||"c-det"}" data-key="${d.key}"><span class="k">${ROLEIC[d.role]} ${CLUBS[d.club].code}</span><div class="mini">${chibi(d)}</div><span class="nm">${d.name}</span><span class="stt">${statLine(d)}</span>${o.info?`<span class="inf" data-act="c-tinfo" data-key="${d.key}" role="button" aria-label="Ver ${d.name}">ℹ️</span>`:""}${o.badge?`<span class="bdg ${o.bc||""}">${o.badge}</span>`:""}</button>`;
 function showCol(){
   G=null;ASK=null;CV.back="home";ensureShell();document.getElementById("screen").innerHTML="";
   const canPack=isDono()||COL.packs>0||COL.ess>=PACK_COST;
@@ -2239,7 +2245,7 @@ function albumGrid(){
 function teamGrid(){
   const list=applyF(ownedList().filter(d=>!COL.team.includes(d.key)),false);
   return `<div id="cgrid"><p>${list.length} cartas${list.length>GRID_MAX?` · mostrando ${GRID_MAX}`:""}</p>
-  <div class="cg">${list.length?list.slice(0,GRID_MAX).map(d=>colCard(d,{act:"c-add",cls:COL.team.length>=TEAM_SIZE?"dim":""})).join(""):`<p>Nada aqui. Mude os filtros ou abra pacotes pra ganhar mais jogadores.</p>`}</div></div>`;
+  <div class="cg">${list.length?list.slice(0,GRID_MAX).map(d=>colCard(d,{act:"c-add",info:true,cls:COL.team.length>=TEAM_SIZE?"dim":""})).join(""):`<p>Nada aqui. Mude os filtros ou abra pacotes pra ganhar mais jogadores.</p>`}</div></div>`;
 }
 function showAlbum(){
   CV.back="album";CV.grid=albumGrid;
@@ -2263,7 +2269,7 @@ function showTeam(){
   ${COL.team.length?`<h3 class="sub">Técnico (de um clube do seu time)</h3><div class="chips">${teamClubs().map(k=>`<button type="button" class="chip ${k===cc?"on":""}" data-act="c-coach" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
   <p style="font-size:12px"><b style="color:var(--gold)">${CLUBS[cc].coach.name}</b>: ${CLUBS[cc].coach.power}. ${CLUBS[cc].coach.text}</p>`:""}
   <h3 class="sub">No time <small>(toque pra tirar)</small></h3>
-  <div class="cg">${mine.length?mine.map(d=>colCard(d,{act:"c-rem"})).join(""):`<p>Ninguém ainda. Toque nas cartas abaixo.</p>`}</div>
+  <div class="cg">${mine.length?mine.map(d=>colCard(d,{act:"c-rem",info:true})).join(""):`<p>Ninguém ainda. Toque nas cartas abaixo.</p>`}</div>
   <h3 class="sub">Sua coleção <small>(toque pra pôr)</small></h3>
   ${filterBar(false)}${teamGrid()}
   <div class="row"><button class="btn s" data-act="c-auto">Completar sozinho</button><button class="btn s" data-act="c-clear">Limpar</button><button class="btn s" data-act="c-home">Voltar</button>${teamOk()?`<button class="btn p" data-act="c-play">Jogar</button>`:""}</div></div>`);
@@ -2289,7 +2295,7 @@ function showDet(k){
   <div class="detc">${nav?`<button type="button" class="arw" data-act="c-nav" data-d="-1" aria-label="Carta anterior">‹</button>`:""}${bigCard({def:d,dmg:0,en:[]})}${nav?`<button type="button" class="arw" data-act="c-nav" data-d="1" aria-label="Próxima carta">›</button>`:""}</div>
   ${nav?`<p style="text-align:center;font-size:12px;margin:0 0 6px">${i+1} de ${l.length} · deslize ou use as setas</p>`:""}${habBox(d)}
   <div class="habx" style="border-color:var(--line)">${evoTx(d)}</div>
-  <div class="row"><button class="btn s" data-act="c-back">Voltar</button></div></div>`);
+  <div class="row">${CV.back==="team"?`<button class="btn p" data-act="c-tadd" data-key="${k}" ${!COL.team.includes(k)&&COL.team.length>=TEAM_SIZE?"disabled":""}>${COL.team.includes(k)?"Tirar do time":"Pôr no time"}</button>`:""}<button class="btn s" data-act="c-back">Voltar</button></div></div>`);
 }
 const colBack=()=>CV.back==="album"?showAlbum():CV.back==="team"?showTeam():CV.back==="pack"?showPack():showCol();
 
@@ -2310,6 +2316,8 @@ document.addEventListener("click",e=>{
   if(a==="c-back")return colBack();
   if(a==="c-team")return showTeam();
   if(a==="c-role"){CV.role=el.dataset.r;return showTeam();}
+  if(a==="c-tinfo"){e.stopPropagation();CV.back="team";return showDet(el.dataset.key);}
+  if(a==="c-tadd"){const k=el.dataset.key;if(COL.team.includes(k))COL.team=COL.team.filter(x=>x!==k);else if(COL.team.length<TEAM_SIZE)COL.team.push(k);colSave();return showTeam();}
   if(a==="c-add"){if(COL.team.length<TEAM_SIZE&&!COL.team.includes(el.dataset.key)){COL.team.push(el.dataset.key);colSave();}return keepScroll(showTeam);}
   if(a==="c-rem"){COL.team=COL.team.filter(k=>k!==el.dataset.key);colSave();return keepScroll(showTeam);}
   if(a==="c-coach"){COL.coach=el.dataset.club;colSave();return showTeam();}
