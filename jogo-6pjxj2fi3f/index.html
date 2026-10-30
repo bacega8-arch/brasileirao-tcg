@@ -1241,12 +1241,30 @@ const CRAQUES=["cap-viveros","cap-zapelli","cam-bernard","cam-fred","bah-everton
 for(const k of CRAQUES){const d=DEFS[k];if(!d||d.stage==="Ídolo")continue;d.stage="Ídolo";d.hp+=20;d.moves.forEach(m=>{m.p+=10;});}
 /* craques mais roubados (Leonardo, 2026-10-30): tanque ganha +30 de vida; suporte e carry batem +20 */
 for(const d of Object.values(DEFS))if(d.kind==="player"&&d.stage==="Ídolo"){if(d.role==="T")d.hp+=30;else d.moves.forEach(m=>{if(m.kind==="dmg")m.p+=20;});}
-/* jogada forte (Leonardo, 2026-10-30): todo jogador tem um 2º ataque que precisa de 4 energias (qualquer tipo)
-   mas só gasta 2. Dano = 2x a jogada normal + 20, sem moeda. Craque ganha +20. */
-const FORTE={T:"Carrinho voador",S:"Lançamento de 40 metros",C:"Chute de placa"},FORTE_COST=4,FORTE_PAY=2;
+/* ataques (Leonardo, 2026-10-30): todo jogador tem 2 ataques.
+   1º = a jogada da carta (dano, custo e moeda de hoje). 2º = jogada forte da função: precisa de X energias (qualquer tipo) e gasta só Y.
+   Craque (todo Ídolo) troca o 2º pela Jogada de Craque. A moeda só vale no 1º ataque. */
+/* tanque não ataca no 1º: ele protege (Leonardo, 2026-10-30). TANK_MODE: escudo | cura | semdano */
+const TANK_MODE="buff";
+function tankMoves(d,t){
+  const star=d.stage==="Ídolo";
+  const shield={n:"Fechar a porta",kind:"shield",cost:[t],shield:star?30:20,tx:`Ele toma -${star?30:20} de dano até a sua próxima vez. Só funciona na frente.`};
+  const heal={n:"Respirar fundo",kind:"selfheal",cost:[t],heal:star?30:20,tx:`Ele recupera ${star?30:20} de vida.`};
+  d.moves[0]=TANK_MODE==="cura"?heal:shield;
+  if(TANK_MODE==="buff")d.moves[1]=star?{n:"Xerife da área",kind:"tshield",cost:Array(4).fill("C"),pay:2,shield:20,forte:true,craque:true,tx:"Jogada de Craque: todo mundo da sua frente toma -20 de dano até a sua próxima vez. Precisa de 4 energias, gasta só 2."}
+    :{n:"Carrinho na bola",kind:"tbuff",cost:Array(3).fill("C"),pay:2,buff:30,forte:true,tx:"Rouba a bola: um companheiro bate +30 no próximo ataque. Precisa de 3 energias, gasta só 2."};
+  if(TANK_MODE==="semdano")d.moves[1]=star?{n:"Xerife da área",kind:"shield",cost:Array(4).fill("C"),pay:2,shield:50,forte:true,craque:true,tx:"Jogada de Craque: ele toma -50 de dano até a sua próxima vez. Precisa de 4 energias, gasta só 2."}
+    :{n:"Segurar a bronca",kind:"selfheal",cost:Array(3).fill("C"),pay:2,heal:40,forte:true,tx:"Ele recupera 40 de vida. Precisa de 3 energias, gasta só 2."};
+}
+const ATK2={T:["Carrinho na bola",50,3,2],S:["Lançamento de 40 metros",60,3,2],C:["Chute de placa",80,4,2]};
+const CRAQUE_ATK={T:["Xerife da área",60,4,2],S:["Passe de letra",80,4,2],C:["Golaço de bicicleta",100,4,2]};
 for(const d of Object.values(DEFS))if(d.kind==="player"){
-  const base=Math.max(0,...d.moves.filter(m=>m.kind==="dmg").map(m=>m.p))||20;
-  d.moves.push({n:FORTE[d.role],kind:"dmg",cost:Array(FORTE_COST).fill("C"),p:base*2+20+(d.stage==="Ídolo"?20:0),coin:0,forte:true,tx:`Jogada forte: precisa de ${FORTE_COST} energias, mas gasta só ${FORTE_PAY}.`});
+  const m0=d.moves.find(m=>m.kind==="dmg"),t=(d.moves[0]&&d.moves[0].cost.find(x=>x!=="C"))||CLUBS[d.club].main||"T";
+  const a1=m0||{n:"Chutão",kind:"dmg",cost:[t],p:d.stage==="Ídolo"?20:10,coin:0};
+  const craque=d.stage==="Ídolo",c=craque?CRAQUE_ATK[d.role]:ATK2[d.role];
+  const a2={n:c[0],kind:"dmg",cost:Array(c[2]).fill("C"),p:c[1],coin:0,pay:c[3],forte:true,craque,tx:`${craque?"Jogada de Craque: só craque faz. ":""}Precisa de ${c[2]} energias, mas gasta só ${c[3]}.`};
+  d.moves=[a1,a2];
+  if(d.role==="T")tankMoves(d,t);
 }
 
 /* ================== ARTE CARTOON ==================
@@ -1276,7 +1294,7 @@ function habBonus(s,p){
 }
 /* quanto de dano a habilidade segura */
 function habShield(o,t){
-  let r=0;const h=hab(t),fr=inFront(o,t);
+  let r=t.shield||0;const h=hab(t),fr=inFront(o,t);
   if(h&&h[1]==="es"&&((h[0]==="fr"&&fr)||(h[0]==="me"&&half_(t))))r+=h[2];
   if(fr){
     for(const q of front(o))if(habIs(q,"fr","et"))r+=hab(q)[2];
@@ -1433,7 +1451,7 @@ const shieldOf=s=>10*supsOf(s,"guard").length;
 const isStar=d=>d.stage==="Ídolo"||!!d.from;
 function pay(p,move){
   if(p.free){p.free=false;return true;}
-  if(move.forte){p.en.splice(0,FORTE_PAY);return false;}
+  if(move.pay!=null){p.en.splice(0,move.pay);return false;}
   for(const t of effCost(move)){const i=t==="C"?0:p.en.findIndex(e=>e.def.type===t);if(i>=0&&p.en.length)p.en.splice(i,1);}
   return false;
 }
@@ -1464,6 +1482,10 @@ function bonusOf(s,p,move){
    Frente do rival vazia: quem está na frente chuta ao gol. Derrubou, é gol. */
 function targets(s,p,move){
   const o=other(s);
+  if(move.kind==="shield")return inFront(s,p)?[p]:[];
+  if(move.kind==="tshield")return front(s).length?[p]:[];
+  if(move.kind==="tbuff")return fieldOf(s).filter(x=>x!==p&&x.def.role!=="T");
+  if(move.kind==="selfheal")return p.dmg>0?[p]:[];
   if(move.kind==="buff")return fieldOf(s).filter(x=>x.def.role==="C");
   if(move.kind==="heal")return fieldOf(s).filter(x=>x.dmg>0);
   if(!inFront(s,p)&&!canBack(p))return [];
@@ -1481,6 +1503,8 @@ const whyNot=(s,p,m)=>{
   if(p.done)return "Ele já atacou neste turno.";
   if(m.kind==="dmg"&&!inFront(s,p)&&!canBack(p))return "Só ataca quem está na frente.";
   const mi=missing(p,m);if(mi.length)return `Falta energia: ${mi.map(x=>EN[x]).join(", ")}.`;
+  if(!targets(s,p,m).length&&m.kind==="shield")return "O escudo só funciona na frente.";
+  if(!targets(s,p,m).length&&m.kind==="selfheal")return "Ele está com a vida cheia.";
   if(!targets(s,p,m).length)return m.kind==="dmg"?"Não tem ninguém pra atacar agora.":"Ninguém pra receber isso agora.";
   return "";
 };
@@ -1497,7 +1521,7 @@ async function startTurn(side,first){
     if(side==="me"||G.online){T.supEn.push({t,from:sp.def.name});log(`⚡ ${sp.def.name} gerou energia de ${EN[t]}. Toque num jogador da frente pra dar.`,side);}
     else{const to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}}
   await habTurnStart(side);
-  for(const p of fieldOf(side))p.done=false;
+  for(const p of fieldOf(side)){p.done=false;p.shield=0;}
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
   if(side==="ai"&&G.diff==="dificil"&&!G.online)T.energyLeft=2;
   if(G.half===10)log("⏱️ Intervalo! Começa o segundo tempo.","big");
@@ -1546,7 +1570,12 @@ async function act(side,p,move,target,dbl){
   G.busy=true;G.sheet=null;render();
   const T=T_(side),o=other(side);T.attacked=true;p.done=true;
   if(move.kind==="dmg"&&pay(p,move))log(`⭐ ${p.def.name} usa o ataque grátis e não gasta energia.`,side);
-  if(move.kind==="buff"){target.buff+=move.buff;log(`${p.def.name} usa "${move.n}": ${target.def.name} ganha +${move.buff} no próximo ataque.`,side);}
+  if(move.kind==="tbuff"){pay(p,move);target.buff=(target.buff||0)+move.buff;log(`🦵 ${p.def.name} usa "${move.n}" e rouba a bola: ${target.def.name} bate +${move.buff} no próximo ataque!`,side);}
+  else if(move.kind==="tshield"){pay(p,move);for(const q of front(side))q.shield=Math.max(q.shield||0,move.shield);log(`🛡️ ${p.def.name} usa "${move.n}": a frente toda toma -${move.shield} de dano até a próxima vez de ${nm(side)}.`,side);}
+  else if(move.kind==="shield"||move.kind==="selfheal"){pay(p,move);
+    if(move.kind==="shield"){p.shield=Math.max(p.shield||0,move.shield);log(`🛡️ ${p.def.name} usa "${move.n}": toma -${move.shield} de dano até a próxima vez de ${nm(side)}.`,side);}
+    else{const v=Math.min(p.dmg,move.heal);p.dmg-=v;log(`💚 ${p.def.name} usa "${move.n}": recupera ${v} de vida.`,side);}}
+  else if(move.kind==="buff"){target.buff+=move.buff;log(`${p.def.name} usa "${move.n}": ${target.def.name} ganha +${move.buff} no próximo ataque.`,side);}
   else if(move.kind==="heal"){target.dmg=Math.max(0,target.dmg-move.heal);log(`${p.def.name} usa "${move.n}": ${target.def.name} recupera ${move.heal} de vida.`,side);}
   else{
     const h=hab(p);
@@ -1695,7 +1724,12 @@ function bestAction(s){
     if(!canAct(s,p,m))continue;
     for(const t of targets(s,p,m)){
       let sc=0;
-      if(m.kind==="buff")sc=t.buff?2:20+m.buff/5;
+      if(m.kind==="tbuff")sc=t.buff?3:(inFront(s,t)&&!t.done?40:15);
+      else if(m.kind==="tshield")sc=front(o).length?10+8*front(s).filter(q=>!q.shield).length:0;
+      else if(m.kind==="shield"){const m2=p.def.moves.find(x=>x.forte);sc=front(o).length&&!p.shield?18+(p.dmg>p.def.hp*.4?12:0):0;
+        if(m2&&p.en.length+1>=m2.cost.length-1&&p.dmg<p.def.hp*.5)sc=0;} // guarda energia pro Carrinho
+      else if(m.kind==="selfheal")sc=Math.min(m.heal,p.dmg)*0.7;
+      else if(m.kind==="buff")sc=t.buff?2:20+m.buff/5;
       else if(m.kind==="heal")sc=Math.min(m.heal,t.dmg)*0.6;
       else{
         const exp=m.p+bonusOf(s,p,m)+m.coin*.5;
@@ -1787,8 +1821,8 @@ async function finishMatch(){
 function log(t,cls){G.log.unshift({t,cls:cls||""});if(G.log.length>400)G.log.pop();}
 const eDot=t=>`<i class="e ${t}" title="${EN[t]}">${t==="C"?"★":t}</i>`;
 function mvLine(m){
-  const val=m.kind==="buff"?`+${m.buff}`:m.kind==="heal"?`♥${m.heal}`:m.p;
-  if(m.forte)return `<div class="fx"><span style="display:flex;gap:1px">${eDot("C")}<b style="font-size:9px">x${FORTE_COST}</b></span><span>💥 ${m.n}</span><strong>${val}</strong></div>`;
+  const val=m.kind==="buff"||m.kind==="tbuff"?`+${m.buff}`:m.kind==="tshield"?`-${m.shield}`:m.kind==="heal"||m.kind==="selfheal"?`♥${m.heal}`:m.kind==="shield"?`-${m.shield}`:m.p;
+  if(m.forte)return `<div class="fx"><span style="display:flex;gap:1px">${eDot("C")}<b style="font-size:9px">x${m.cost.length}</b></span><span>${m.craque?"⭐":"💥"} ${m.n}</span><strong>${val}</strong></div>`;
   return `<div><span style="display:flex;gap:1px">${effCost(m).map(eDot).join("")}</span><span>${m.n}${m.coin?` <em>🪙+${m.coin}</em>`:""}</span><strong>${val}</strong></div>`;
 }
 /* carta grande, usada na gaveta */
@@ -1812,7 +1846,7 @@ function fieldCard(s,p){
     <div class="in"><div class="hd"><span class="nm">${d.name}</span><span class="fo">❤️${d.hp-p.dmg}</span></div>
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="art">${chibi(d)}</div>
-    <div class="ft"><span class="ro">${ROLEIC[d.role]}</span>${p.poison?"😤":""}${p.para?"🔒":""}${p.free?`<span class="bf" title="Ataque grátis">⭐</span>`:""}${p.en.map(e=>eDot(e.def.type)).join("")}${p.buff?`<span class="bf">+${p.buff}</span>`:""}</div></div></button>`;
+    <div class="ft"><span class="ro">${ROLEIC[d.role]}</span>${p.poison?"😤":""}${p.para?"🔒":""}${p.shield?`<span class="bf">🛡️-${p.shield}</span>`:""}${p.free?`<span class="bf" title="Ataque grátis">⭐</span>`:""}${p.en.map(e=>eDot(e.def.type)).join("")}${p.buff?`<span class="bf">+${p.buff}</span>`:""}</div></div></button>`;
 }
 function lineHTML(s,l){
   const T=T_(s),cls=l==="F"?"front":"back";
@@ -1918,7 +1952,7 @@ function sheetHTML(){
       d.moves.forEach((m,i)=>{
         const ok=can&&canAct("me",c,m),b=bonusOf("me",c,m);
         const what=m.kind==="dmg"?`${m.coin?`Moeda: ${luckTx("me")} soma +${m.coin}. `:""}${m.tx||""}${b?`Bônus agora +${b}.`:""}`:m.tx;
-        btns.push(AB(`move" data-i="${i}`,m.n,`${what} ${ok?"":whyNot("me",c,m)}`,ok?"pri":"",{left:`<span style="display:flex;gap:2px">${effCost(m).map(eDot).join("")}</span>`,val:m.kind==="buff"?"+"+m.buff:m.kind==="heal"?"♥"+m.heal:m.p},!ok));
+        btns.push(AB(`move" data-i="${i}`,m.n,`${what} ${ok?"":whyNot("me",c,m)}`,ok?"pri":"",{left:`<span style="display:flex;gap:2px">${effCost(m).map(eDot).join("")}</span>`,val:m.kind==="buff"||m.kind==="tbuff"?"+"+m.buff:m.kind==="tshield"?"🛡️"+m.shield:m.kind==="heal"||m.kind==="selfheal"?"♥"+m.heal:m.kind==="shield"?"🛡️"+m.shield:m.p},!ok));
       });
       if(mechOf("me")==="vstar"&&!me.vstarUsed&&inFront("me",c))d.moves.forEach((m,i)=>{const ok=can&&canAct("me",c,m);
         btns.push(AB(`move" data-i="${i}" data-dbl="1`,`🌟 ${m.n} em dobro`,`${CLUBS[me.club].coach.power}: só 1 vez no jogo.`,"",{left:"",val:m.p*2},!ok));});
@@ -2009,7 +2043,9 @@ function rulesHTML(){return `
     <li><b>Vida ❤️:</b> cada ataque tira vida. Chegou a zero, o jogador sai de campo. A Massagem devolve vida.</li>
     <li><b>Gol:</b> <b>derrubou, é gol!</b> Qualquer jogador seu que derrubar um rival faz gol na hora. Se a frente do rival estiver vazia, quem está na sua frente chuta direto.</li>
     <li><b>Seu turno:</b> compre 1, coloque jogadores, evolua, faça <b>1 troca de linha</b>, dê <b>1 energia</b> pra quem quiser e use eventos. Depois, <b>cada jogador da frente pode atacar 1 vez</b>, se tiver energia (o ataque gasta a energia dele). Quando acabar, toque em <b>Encerrar turno</b>.</li>
-    <li><b>💥 Jogada forte:</b> todo jogador tem uma. Precisa de 4 energias de qualquer tipo, mas só gasta 2. Bate o dobro da jogada normal +20, sem moeda.</li>
+    <li><b>2 ataques:</b> o 1º é a jogada da carta (a moeda só vale nele). O 2º é a jogada forte, que precisa de várias energias de qualquer tipo mas gasta só 2: ✨ Lançamento de 40 metros 60 (precisa 3), ⚔️ Chute de placa 80 (precisa 4).</li>
+    <li><b>🛡️ Tanque não dá dano:</b> ele protege. 1º "Fechar a porta": toma -20 até a sua próxima vez. 2º "Carrinho na bola": rouba a bola e um companheiro bate +30 no próximo ataque. Craque tanque: "Xerife da área", a frente toda toma -20.</li>
+    <li><b>⭐ Jogada de Craque:</b> só craque faz, porque craque resolve. Precisa 4, gasta 2: Xerife da área 60, Passe de letra 80, Golaço de bicicleta 100.</li>
     <li><b>Frente vazia no fim do turno:</b> alguém de trás é obrigado a subir.</li>
     <li><b>Energia:</b> não vem na mão. Todo turno você ganha 1 pra dar, e os suportes de trás geram mais. Fica grudada no jogador, e <b>cada ataque gasta 1</b>. ${eDot("T")} Técnica, ${eDot("V")} Velocidade, ${eDot("C")} qualquer uma.</li>
     <li><b>⭐ Ataque grátis:</b> Ídolos e quem acabou de evoluir têm 1 ataque que não gasta energia.</li>
