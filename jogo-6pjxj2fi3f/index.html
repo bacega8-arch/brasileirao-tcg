@@ -1,9 +1,9 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0B1510"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Brasileirão TCG">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Brasileirão Cards">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icone-192.png"><link rel="apple-touch-icon" href="icone-180.png">
-<title>Brasileirão TCG</title>
+<title>Brasileirão Cards</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
 <style>
@@ -164,6 +164,12 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .cl .go b{font-family:var(--f-display);font-size:17px;text-transform:uppercase}
 .cl .go small{color:var(--muted);font-size:12px}
 .cl .inf{width:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:16px}
+.ann{position:absolute;inset:0;z-index:25;display:grid;place-items:center;background:rgba(4,10,7,.55);pointer-events:none}
+.annIn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}
+.annT{background:var(--theirs);color:#2A0606;font-weight:800;border-radius:999px;padding:6px 14px;text-align:center;max-width:320px}
+@media (prefers-reduced-motion:no-preference){.annIn{animation:pop .5s ease-out}}
+.pw{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:2px}
+.pw b{font-family:var(--f-display);text-transform:uppercase;font-size:16px}.pw span{color:var(--gold);font-weight:700}.pw small{color:var(--muted)}
 /* molduras por estágio (mesmas cores da galeria de arte) */
 .f-titular{background:linear-gradient(180deg,#FFE680 0%,#FFD23F 100%)}
 .f-cria{background:linear-gradient(180deg,#B9F0A8 0%,#5DBB63 100%)}
@@ -1014,8 +1020,8 @@ window.ArteCartoon={
 <script>
 /* ================== DADOS DOS CLUBES ================== */
 const CLUBS={
-  pal:{id:"pal",code:"PAL",main:"V",coin:true,name:"Palmeiras",c1:"#006437",c2:"#FFFFFF",stripes:"none",shorts:"#FFFFFF",socks:"#006437",
-    coach:{name:"Abel Ferreira",power:"Cabeça fria",text:"Uma vez por turno, se a moeda der COROA num ataque seu, você joga a moeda de novo."},
+  pal:{id:"pal",code:"PAL",main:"V",coin:true,luck:"Coroa",name:"Palmeiras",c1:"#006437",c2:"#FFFFFF",stripes:"none",shorts:"#FFFFFF",socks:"#006437",
+    coach:{name:"Abel Ferreira",power:"Cabeça fria",text:"Uma vez por turno, se a moeda der CARA num ataque seu, você joga a moeda de novo."},
     blurb:"Jovens com potencial. Dependem da moeda, mas têm mais suportes que geram energia. As crias da base evoluem."},
   fla:{id:"fla",code:"FLA",main:"T",coin:false,name:"Flamengo",c1:"#C8102E",c2:"#111111",stripes:"h",shorts:"#FFFFFF",socks:"#111111",
     coach:{name:"Leonardo Jardim",power:"Elenco milionário",text:"Seus Ídolos batem +10."},
@@ -1027,7 +1033,7 @@ const ROLEIC={T:"🛡️",S:"✨",C:"⚔️"};
 const SK={a:"#F1C9A5",b:"#E2B48C",c:"#C98A5B",d:"#8D5A3B",e:"#5E3A24"};
 const HC={k:"#141014",d:"#2A1A10",b:"#5A3A20",l:"#B88A4A"};
 const L=(skin,hair,style,beard)=>({skin:SK[skin],hair:HC[hair],style,beard:!!beard});
-/* jogada: nome, energia que gasta, dano, bônus da moeda (CARA soma) */
+/* jogada: nome, energia que gasta, dano, bônus da moeda (o lado do time soma) */
 const M=(n,cost,p,coin,extra)=>Object.assign({n,cost,p,coin:coin||0,kind:"dmg"},extra||{});
 const DEFS={};
 function P(club,key,name,num,pos,stage,hp,moves,look,from,extra){DEFS[key]=Object.assign({kind:"player",club,key,name,num,pos,role:ROLE[pos],stage,hp,moves,look,from:from||null},extra||{});}
@@ -1074,14 +1080,14 @@ P("fla","plata","Gonzalo Plata",19,"A","Titular",90,[M("Arrancada pela direita",
 
 const EV={
   massagem:{kind:"event",key:"massagem",name:"Massagem do fisio",ic:"💆",tx:"Devolve 40 de vida a um jogador seu."},
-  mandrake:{kind:"event",key:"mandrake",name:"Pênalti mandrake",ic:"🎭",tx:"Só se o rival tiver 1 tanque ou menos. Moeda: CARA é gol! Gasta o seu ataque do turno."},
+  mandrake:{kind:"event",key:"mandrake",name:"Pênalti mandrake",ic:"🎭",tx:"Só se o rival tiver 1 tanque ou menos. Moeda: deu o seu lado, é gol! Gasta o seu ataque do turno."},
   escanteio:{kind:"event",key:"escanteio",name:"Escanteio",ic:"🚩",tx:"Seu próximo ataque neste turno ganha +20."},
   lancamento:{kind:"event",key:"lancamento",name:"Lançamento de 40 metros",ic:"🎯",tx:"Você pode dar mais 1 energia neste turno."},
   diretoria:{kind:"event",key:"diretoria",name:"Diretoria perdeu a paciência",ic:"📉",tx:"Só se o rival estiver perdendo. O técnico dele é demitido e perde o poder."},
   chuva:{kind:"stadium",key:"chuva",name:"Chuva no Maracanã",ic:"🌧️",tx:"Fica na mesa. Ataques de Velocidade gastam 1 energia a mais."},
   caldeirao:{kind:"stadium",key:"caldeirao",name:"Caldeirão da torcida",ic:"🔥",tx:"Fica na mesa. Ataques de quem jogou esta carta ganham +10."},
-  caicai:{kind:"reaction",key:"caicai",name:"Cai-cai",ic:"🤕",tx:"Use na vez do rival, quando um ataque dele ia derrubar seu jogador. Moeda: CARA é falta e o dano não conta."},
-  var:{kind:"reaction",key:"var",name:"VAR",ic:"📺",tx:"Use na vez do rival, quando ele fizer gol. Moeda: CARA e o gol é anulado."}
+  caicai:{kind:"reaction",key:"caicai",name:"Cai-cai",ic:"🤕",tx:"Use na vez do rival, quando um ataque dele ia derrubar seu jogador. Moeda: deu o seu lado, é falta e o dano não conta."},
+  var:{kind:"reaction",key:"var",name:"VAR",ic:"📺",tx:"Use na vez do rival, quando ele fizer gol. Moeda: deu o seu lado, o gol é anulado."}
 };
 const DECKS={
   pal:{players:["gomez","murilo","benedetti1","benedetti2","arthur1","arthur2","marlon","andreas","evangelista","flaco","mauricio","arias","roque1","roque2","paulinho"],
@@ -1094,15 +1100,15 @@ const DECKS={
    As cartas vêm do módulo de arte (ArteCartoon.players): nome, número e posição.
    Aqui cada jogador ganha vida, ataque e energia, e cada clube ganha a lore e a mecânica dele (LORE). */
 const LORE=/*LORE*/{"cap": {"apelido": "Furacão", "mascote": "Furacão", "estadio": "Arena da Baixada (Ligga Arena)", "tecnico": "Odair Hellmann", "tradicoes": "Campeão brasileiro de 2001, da Copa do Brasil de 2019 e bicampeão da Sul-Americana (2018 e 2021). Joga numa arena moderna e fechada, com teto retrátil e gramado sintético, onde a torcida aperta o rival o jogo inteiro.", "lore": "Na Arena da Baixada o barulho não para e o rival nunca respira. Quando o Furacão acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Caldeirão da Baixada", "estilo": "moeda", "energia": "V"}, "cam": {"apelido": "Galo", "mascote": "Galo", "estadio": "Arena MRV", "tecnico": "Eduardo Domínguez", "tradicoes": "O lema da torcida é \"Eu acredito\", nascido na Libertadores de 2013, com Ronaldinho e a defesa de pênalti de Victor. Campeão brasileiro em 1971 e 2021, tem ídolos como Reinaldo e Hulk.", "lore": "O Galo vive de noites heroicas em que um craque decide tudo. Uma vez por partida, um ataque do Atlético causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Eu Acredito", "estilo": "forte", "energia": "V"}, "bah": {"apelido": "Esquadrão de Aço", "mascote": "Super-Homem Tricolor", "estadio": "Arena Fonte Nova", "tecnico": "Rogério Ceni", "tradicoes": "Primeiro campeão nacional do Brasil (Taça Brasil de 1959) e campeão brasileiro de 1988. O apelido \"Esquadrão de Aço\" fala de um time duro, difícil de vencer.", "lore": "Um time de aço não deixa o adversário jogar. Quando o Bahia acerta um ataque, joga a moeda: se der cara, o jogador atingido não pode atacar no próximo turno.", "mecanica": "paralisia", "nome_mecanica": "Esquadrão de Aço", "estilo": "forte", "energia": "T"}, "bot": {"apelido": "Glorioso", "mascote": "Manequinho", "estadio": "Estádio Nilton Santos", "tecnico": "Tite", "tradicoes": "O clube da Estrela Solitária teve Garrincha, Nilton Santos e Didi, gênios da Seleção. Em 2024 viveu o ano mais mágico da sua história, ganhando a Libertadores e o Brasileirão.", "lore": "A estrela do Botafogo brilha forte nos jogos grandes, como Garrincha brilhava. Uma vez por partida, um ataque do Botafogo causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Estrela Solitária", "estilo": "forte", "energia": "T"}, "rbb": {"apelido": "Massa Bruta", "mascote": "Touro", "estadio": "Estádio Nabi Abi Chedid", "tecnico": "Vagner Mancini", "tradicoes": "Desde 2019 faz parte da rede Red Bull, famosa por usar dados e olheiros para achar jovens talentos baratos e vendê-los caro. Foi vice da Sul-Americana em 2021.", "lore": "O Bragantino sempre tem olheiros procurando a próxima joia. Por isso compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Olheiros do Touro", "estilo": "moeda", "energia": "V"}, "cha": {"apelido": "Verdão do Oeste", "mascote": "Índio Condá", "estadio": "Arena Condá", "tecnico": "Rafael Lacerda", "tradicoes": "Saiu do interior de Santa Catarina até a final da Sul-Americana de 2016, título que recebeu após a tragédia aérea daquele ano. Reconstruiu o time e é símbolo de força e de nunca desistir.", "lore": "A Chape aprendeu a se levantar mesmo nos piores momentos. No começo de cada turno dela, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Força Chape", "estilo": "moeda", "energia": "V"}, "cor": {"apelido": "Timão", "mascote": "Mosqueteiro", "estadio": "Neo Química Arena", "tecnico": "Clarence Seedorf", "tradicoes": "A Fiel é uma das maiores torcidas do Brasil e empurra o time com o grito \"Aqui é Corinthians\". Campeão da Libertadores e do Mundial em 2012, o clube tem fama de jogar com garra.", "lore": "Com a Fiel cantando, o rival sente a pressão a cada minuto. Quando o Corinthians acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Pressão da Fiel", "estilo": "forte", "energia": "V"}, "ctb": {"apelido": "Coxa", "mascote": "Vovô Coxa", "estadio": "Estádio Couto Pereira", "tecnico": null, "tradicoes": "Clube mais antigo do Paraná e campeão brasileiro de 1985. Já caiu e voltou à Série A várias vezes, sempre empurrado pela torcida no Alto da Glória.", "lore": "O Coxa é especialista em dar a volta por cima depois das quedas. No começo de cada turno dele, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Volta por Cima", "estilo": "moeda", "energia": "T"}, "cru": {"apelido": "Raposa", "mascote": "Raposa", "estadio": "Mineirão", "tecnico": "Artur Jorge", "tradicoes": "Bicampeão da Libertadores (1976 e 1997), recordista de Copas do Brasil e dono da Tríplice Coroa de 2003. Os times de 2013 e 2014 foram bicampeões brasileiros com ataques rápidos e envolventes.", "lore": "Como uma raposa esperta, o Cruzeiro troca de posição rápido para pegar o rival desprevenido. Ele pode fazer 2 trocas de linha por turno, em vez de 1.", "mecanica": "recuo", "nome_mecanica": "Astúcia da Raposa", "estilo": "forte", "energia": "T"}, "flu": {"apelido": "Tricolor das Laranjeiras", "mascote": "Cartola", "estadio": "Maracanã", "tecnico": "Marcão", "tradicoes": "Campeão da Libertadores de 2023, tem a torcida do pó de arroz no Maracanã. Sua base em Xerém revelou craques como Marcelo, Thiago Silva e João Pedro.", "lore": "Xerém nunca para de revelar moleques prontos para jogar. Por isso o Fluminense compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Moleques de Xerém", "estilo": "moeda", "energia": "T"}, "gre": {"apelido": "Imortal Tricolor", "mascote": "Mosqueteiro", "estadio": "Arena do Grêmio", "tecnico": "Renato Gaúcho", "tradicoes": "Tricampeão da Libertadores (1983, 1995 e 2017) e campeão mundial em 1983, com Renato Gaúcho como ídolo. O apelido \"Imortal\" vem de viradas épicas como a Batalha dos Aflitos, em 2005.", "lore": "O Imortal nunca morre, mesmo quando parece derrotado. No começo de cada turno dele, o jogador mais machucado da linha de frente recupera 20 de vida.", "mecanica": "cura", "nome_mecanica": "Imortal Tricolor", "estilo": "forte", "energia": "V"}, "int": {"apelido": "Colorado", "mascote": "Saci", "estadio": "Beira-Rio", "tecnico": "Eduardo Baptista", "tradicoes": "Único campeão brasileiro invicto (1979), bicampeão da Libertadores (2006 e 2010) e campeão mundial em 2006, quando marcou forte e venceu o Barcelona de Ronaldinho.", "lore": "O Inter de 2006 parou o Barcelona com marcação apertada. Quando o Inter acerta um ataque, joga a moeda: se der cara, o jogador atingido não pode atacar no próximo turno.", "mecanica": "paralisia", "nome_mecanica": "Muralha Colorada", "estilo": "forte", "energia": "T"}, "mir": {"apelido": "Leão", "mascote": "Leão", "estadio": "Estádio José Maria de Campos Maia (Maião)", "tecnico": "Rafael Guanaes", "tradicoes": "Clube do interior paulista que estreou na Série A em 2025 e surpreendeu o país, ganhando vaga inédita na Libertadores. Joga organizado e sai rápido no contra-ataque.", "lore": "O Leão do interior espera a hora certa e dá o bote em velocidade. Ele pode fazer 2 trocas de linha por turno, em vez de 1.", "mecanica": "recuo", "nome_mecanica": "Bote do Leão", "estilo": "moeda", "energia": "V"}, "rem": {"apelido": "Leão Azul", "mascote": "Leão", "estadio": "Baenão (Estádio Evandro Almeida) e Mangueirão", "tecnico": "Thiago Carpini", "tradicoes": "Gigante do Norte, o Remo voltou à Série A em 2026 depois de décadas. Sua torcida, o \"Fenômeno Azul\", lota o Mangueirão e faz do clássico Re-Pa um dos jogos mais quentes do Brasil.", "lore": "Em Belém, o calor e o Fenômeno Azul cansam qualquer rival. Quando o Remo acerta um ataque, o jogador atingido perde 10 de vida no começo de cada turno dele enquanto estiver na linha de frente.", "mecanica": "veneno", "nome_mecanica": "Fenômeno Azul", "estilo": "moeda", "energia": "V"}, "san": {"apelido": "Peixe", "mascote": "Baleia", "estadio": "Vila Belmiro", "tecnico": "Cuca", "tradicoes": "Casa de Pelé, o Rei do Futebol, o Santos foi bicampeão da Libertadores e do Mundial nos anos 1960 e ganhou de novo a Libertadores em 2011, com Neymar. Os \"Meninos da Vila\" são sua marca.", "lore": "O Santos sempre teve um craque capaz de uma jogada mágica, de Pelé a Neymar. Uma vez por partida, um ataque do Santos causa o dobro de dano.", "mecanica": "vstar", "nome_mecanica": "Magia do Rei", "estilo": "moeda", "energia": "T"}, "sao": {"apelido": "Tricolor Paulista", "mascote": "Santo Paulo", "estadio": "MorumBIS", "tecnico": "Dorival Júnior", "tradicoes": "Tricampeão da Libertadores e do Mundial, com seis títulos brasileiros. Seu maior ídolo, o goleiro Rogério Ceni, marcou mais de 100 gols, muitos deles de falta.", "lore": "No São Paulo até o goleiro fazia gol de longe, cobrando falta. Por isso os carries do São Paulo também podem atacar a linha de trás do rival.", "mecanica": "banco", "nome_mecanica": "Falta do Mito", "estilo": "forte", "energia": "T"}, "vas": {"apelido": "Gigante da Colina", "mascote": "Almirante", "estadio": "São Januário", "tecnico": "Pedro Emanuel", "tradicoes": "Pioneiro na luta contra o racismo com os Camisas Negras de 1923 e a Resposta Histórica. Campeão da Libertadores de 1998, tem como ídolos Roberto Dinamite e Juninho Pernambucano, mestre das cobranças de falta.", "lore": "As faltas de Juninho Pernambucano acertavam o gol de qualquer distância. Por isso os carries do Vasco também podem atacar a linha de trás do rival.", "mecanica": "banco", "nome_mecanica": "Cobrança do Reizinho", "estilo": "forte", "energia": "T"}, "vit": {"apelido": "Leão da Barra", "mascote": "Leão", "estadio": "Barradão (Estádio Manoel Barradas)", "tecnico": "Jair Ventura", "tradicoes": "Conhecido como fábrica de talentos, revelou nomes como Bebeto, Vampeta, Dida, Hulk e David Luiz. Foi vice-campeão brasileiro em 1993 com um time jovem.", "lore": "A base do Vitória vive revelando novos craques. Por isso o Vitória compra 1 carta extra a cada turno.", "mecanica": "busca", "nome_mecanica": "Fábrica do Barradão", "estilo": "moeda", "energia": "V"}}/*FIM*/;
-/* mecânicas importadas do Pokémon TCG. Funcionam como o poder do técnico (técnico demitido = perde) */
+/* poderes dos clubes. Funcionam como o poder do técnico (técnico demitido = perde) */
 const MECH={
-  veneno:{ic:"🧪",pk:"Veneno",tx:"Quando seu ataque acerta e o rival não cai, ele fica envenenado: perde 10 de vida no começo de cada turno dele enquanto estiver na frente."},
-  paralisia:{ic:"⚡",pk:"Paralisia",tx:"Quando seu ataque acerta e o rival não cai, joga a moeda: CARA e ele fica paralisado e não ataca no próximo turno."},
-  vstar:{ic:"🌟",pk:"Poder VSTAR",tx:"Uma vez por jogo, um ataque seu tira o dobro de vida."},
-  busca:{ic:"🔎",pk:"Busca",tx:"Você compra 1 carta a mais em todo turno."},
-  recuo:{ic:"💨",pk:"Recuo grátis",tx:"Você pode fazer 2 trocas de linha por turno em vez de 1."},
-  banco:{ic:"🎯",pk:"Dano no banco",tx:"Seus carries também podem atacar quem está atrás no rival (derrubar quem está atrás não é gol)."},
-  cura:{ic:"💚",pk:"Cura",tx:"No começo do seu turno, seu jogador da frente mais machucado recupera 20 de vida."}
+  veneno:{ic:"😤",pk:"Pressão",tx:"Quando seu ataque acerta e o rival não cai, ele fica pressionado: perde 10 de vida no começo de cada turno dele enquanto estiver na frente. Ir pra trás tira a pressão."},
+  paralisia:{ic:"🔒",pk:"Marcação",tx:"Quando seu ataque acerta e o rival não cai, joga a moeda: se der o seu lado, ele fica marcado e não ataca no próximo turno."},
+  vstar:{ic:"🌟",pk:"Lance de craque",tx:"Uma vez por jogo, um ataque seu tira o dobro de vida."},
+  busca:{ic:"🔎",pk:"Olheiro",tx:"Você compra 1 carta a mais em todo turno."},
+  recuo:{ic:"💨",pk:"Transição rápida",tx:"Você pode fazer 2 trocas de linha por turno em vez de 1."},
+  banco:{ic:"🎯",pk:"Chute de longe",tx:"Seus carries também podem atacar quem está atrás no rival (derrubar quem está atrás não é gol)."},
+  cura:{ic:"💚",pk:"Raça",tx:"No começo do seu turno, seu jogador da frente mais machucado recupera 20 de vida."}
 };
 const mechOf=s=>coachOn(s)?CLUBS[T_(s).club].mech:null;
 const hashS=s=>{let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}return h;};
@@ -1115,7 +1121,7 @@ for(const c of Object.values(ArteCartoon.clubs)){
   if(CLUBS[c.id])continue;
   const lo=LORE[c.id]||{},coin=lo.estilo!=="forte",main=lo.energia==="V"?"V":"T",alt=main==="T"?"V":"T",mech=MECH[lo.mecanica]?lo.mecanica:"busca";
   CLUBS[c.id]={id:c.id,code:c.code,name:c.name,c1:c.c1,c2:c.c2,main,coin,mech,lore:lo,
-    coach:{name:lo.tecnico||`Técnico do ${c.name}`,power:`${MECH[mech].ic} ${lo.nome_mecanica||MECH[mech].pk}`,text:`${MECH[mech].pk} (Pokémon TCG): ${MECH[mech].tx}`},
+    coach:{name:lo.tecnico||`Técnico do ${c.name}`,power:`${MECH[mech].ic} ${lo.nome_mecanica||MECH[mech].pk}`,text:`${MECH[mech].pk}: ${MECH[mech].tx}`},
     blurb:`${lo.lore||""} ${coin?"Depende da moeda.":"Bate forte, sem moeda."}`.trim()};
   const ps=ArteCartoon.players.filter(p=>p.club===c.id);
   for(const p of ps){
@@ -1180,7 +1186,8 @@ function startGame(myClub,aiClub){
 }
 function beginMatch(){
   G.phase="play";log("Apita o árbitro! Começa o jogo e você sai jogando.","big");
-  startTurn("me",true);
+  const cc=s=>{const c=CLUBS[T_(s).club];return `<div class="pw"><b>${s==="me"?"Você":"Rival"} · ${c.name}</b><span>${c.coach.name}: ${c.coach.power}</span><small>${c.coach.text}</small>${c.coin?`<small>🪙 Torce pela ${luckTx(s)}.</small>`:""}</div>`;};
+  showOv(`<div class="dlg"><h2>${nm("me")} x ${nm("ai")}</h2><p>Os poderes de hoje:</p>${cc("ai")}${cc("me")}<div class="row"><button class="btn p" data-act="kick">Apitar o começo</button></div></div>`);
 }
 
 /* ================== REGRAS ================== */
@@ -1249,7 +1256,7 @@ function targets(s,p,move){
 const canAct=(s,p,m)=>!!slotOf(s,p)&&!p.para&&payable(p,m)&&targets(s,p,m).length>0;
 const whyNot=(s,p,m)=>{
   if(!slotOf(s,p))return "Precisa estar em campo.";
-  if(p.para)return "Está paralisado neste turno.";
+  if(p.para)return "Está marcado e não ataca neste turno.";
   if(m.kind==="dmg"&&!inFront(s,p))return "Só ataca quem está na frente.";
   const mi=missing(p,m);if(mi.length)return `Falta energia: ${mi.map(x=>EN[x]).join(", ")}.`;
   if(!targets(s,p,m).length)return m.kind==="dmg"?"A frente do rival está vazia, e só carry chuta ao gol.":"Ninguém pra receber isso agora.";
@@ -1259,7 +1266,7 @@ const whyNot=(s,p,m)=>{
 async function startTurn(side,first){
   G.active=side;G.busy=false;G.sheet=null;const T=T_(side);
   if(!first){draw(T);if(mechOf(side)==="busca"){draw(T);log(`🔎 ${nm(side)} usa a Busca e compra 1 carta a mais.`,side);}}
-  for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`🧪 ${p.def.name} está envenenado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp)knockOut(side,p);}
+  for(const p of front(side))if(p.poison&&!G.over){p.dmg+=10;log(`😤 ${p.def.name} está pressionado e perde 10 de vida.`,side);if(p.dmg>=p.def.hp){knockOut(side,p);log(`Caiu pela pressão: não vale gol.`,side);}}
   if(mechOf(side)==="cura"){const hu=front(side).filter(p=>p.dmg>0).sort((a,b)=>b.dmg-a.dmg)[0];if(hu){hu.dmg=Math.max(0,hu.dmg-20);log(`💚 ${hu.def.name} recupera 20 de vida.`,side);}}
   for(const sp of supsOf(side,"gen")){const t=sp.def.sup.t,to=energyTarget(side,t);if(to)giveEnergy(side,t,to,`✨ ${sp.def.name} gera energia de ${EN[t]} pra ${to.def.name}.`);}
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
@@ -1283,13 +1290,22 @@ async function endTurn(){
   await startTurn(other(G.active));
 }
 function phoneEl(){return document.querySelector(".phone")||document.body;}
+const luckOf=s=>CLUBS[T_(s).club].luck||"Cara";
+const luckTx=s=>luckOf(s).toUpperCase();
 async function flip(side,label){
-  const r=Math.random()<.5;
+  const r=Math.random()<.5,face=r?luckOf(side):(luckOf(side)==="Cara"?"Coroa":"Cara");
   const el=document.createElement("div");el.className="coin spin";el.textContent="…";phoneEl().appendChild(el);
-  await sleep(600*SPEED());el.textContent=r?"Cara":"Coroa";el.classList.remove("spin");
+  await sleep(600*SPEED());el.textContent=face;el.classList.remove("spin");
   await sleep(650*SPEED());el.remove();
-  log(`🪙 ${label}: ${r?"CARA":"COROA"}`,side);
+  log(`🪙 ${label}: ${face.toUpperCase()}${r?" ✅":" ❌"}`,side);
   return r;
+}
+/* aviso grande quando o rival joga uma carta */
+async function announce(c,txt){
+  if(!G||G.phase!=="play")return;
+  const el=document.createElement("div");el.className="ann";
+  el.innerHTML=`<div class="annIn"><span class="annT">${txt}</span>${bigCard(c)}</div>`;
+  phoneEl().appendChild(el);await sleep((G.fast?900:2000));el.remove();
 }
 async function toast(txt,ms=1200){const el=document.createElement("div");el.className="toast";el.textContent=txt;phoneEl().appendChild(el);await sleep(ms*SPEED());el.remove();}
 
@@ -1308,7 +1324,7 @@ async function act(side,p,move,target,dbl){
       if(ok)power+=move.coin;
     }
     p.buff=0;
-    if(dbl&&mechOf(side)==="vstar"&&!T.vstarUsed){T.vstarUsed=true;power*=2;log(`🌟 ${CLUBS[T.club].coach.power}! O ataque vale o dobro.`,side);await toast("VSTAR!",900);}
+    if(dbl&&mechOf(side)==="vstar"&&!T.vstarUsed){T.vstarUsed=true;power*=2;log(`🌟 ${CLUBS[T.club].coach.power}! O ataque vale o dobro.`,side);await toast("Craque!",900);}
     if(target==="GOAL"){log(`${p.def.name} chuta com força ${power}, sem ninguém na frente!`,side);await goal(side);}
     else{
       let dealt=Math.max(0,power-(target.def.guard||0)-shieldOf(o));
@@ -1322,10 +1338,11 @@ async function act(side,p,move,target,dbl){
       if(target.dmg>=target.def.hp){
         knockOut(o,target);
         if(p.def.role==="C"&&wasFront){log(`${p.def.name} passou por ${target.def.name} e ficou cara a cara com o goleiro!`,side);await goal(side);}
-        else if(!front(o).length)log(`A frente de ${nm(o)} ficou vazia!`,side);
+        else{log(p.def.role!=="C"?`Derrubou ${target.def.name}, mas só ⚔️ carry faz gol.`:`Derrubou quem estava atrás: não vale gol.`,side);await toast("Sem gol",900);
+          if(!front(o).length)log(`A frente de ${nm(o)} ficou vazia!`,side);}
       }else if(dealt>0){
-        if(mechOf(side)==="veneno"&&!target.poison&&wasFront){target.poison=true;log(`🧪 ${target.def.name} ficou envenenado!`,side);}
-        if(mechOf(side)==="paralisia"&&await flip(side,"Paralisia")){target.para=true;log(`⚡ ${target.def.name} ficou paralisado e não ataca no próximo turno!`,side);}
+        if(mechOf(side)==="veneno"&&!target.poison&&wasFront){target.poison=true;log(`😤 ${target.def.name} ficou pressionado!`,side);}
+        if(mechOf(side)==="paralisia"&&await flip(side,"Marcação")){target.para=true;log(`🔒 ${target.def.name} ficou marcado e não ataca no próximo turno!`,side);}
       }
     }
   }
@@ -1336,7 +1353,7 @@ async function act(side,p,move,target,dbl){
 async function goal(side){
   await toast("GOOOL!");
   if(await useReaction(other(side),"var",`${nm(side)} fez gol. Chamar o VAR?`)){
-    if(await flip(other(side),"VAR")){log("📺 VAR anulou o gol!","big");await toast("Anulado!",900);return;}
+    if(await flip(other(side),"VAR")){log("📺 VAR anulou o gol!","big");await toast("VAR anulou!",1300);return;}
     log("📺 VAR confirmou: é gol!",other(side));
   }
   T_(side).score++;log(`⚽ GOL de ${nm(side)}! ${score()}`,"big");
@@ -1350,6 +1367,7 @@ function knockOut(side,p){
 async function useReaction(side,key,question){
   const T=T_(side),c=T.hand.find(x=>x.def.key===key);if(!c)return false;
   const yes=side==="ai"?Math.random()<.8:await ask(EV[key].name,question,c);
+  if(yes&&side==="ai")await announce(c,`🪤 ${nm(side)} usa uma carta de resposta!`);
   if(yes){T.hand.splice(T.hand.indexOf(c),1);T.discard.push(c);log(`${nm(side)} usa ${c.def.name}!`,side);render();}
   return yes;
 }
@@ -1358,13 +1376,16 @@ async function useReaction(side,key,question){
 function place(s,c,line){
   const T=T_(s),i=T[line].indexOf(null);if(i<0)return false;
   T.hand.splice(T.hand.indexOf(c),1);c.turnIn=G.half;c.free=isStar(c.def);T[line][i]=c;
-  log(`${c.def.name} entra ${line==="F"?"na frente":"atrás"}.`,s);return true;
+  log(`${c.def.name} entra ${line==="F"?"na frente":"atrás"}.`,s);
+  if(s==="ai"&&G.phase==="play")(G.annq=G.annq||[]).push([c,`➕ ${c.def.name} entra ${line==="F"?"na frente":"atrás"} do ${nm(s)}`]);
+  return true;
 }
 const evoTargets=(s,c)=>fieldOf(s).filter(p=>p.def.key===c.def.from&&p.turnIn!==G.half);
 function evolve(s,c,target){
   const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);
   const old=target.def;target.def=c.def;target.turnIn=G.half;target.free=true;c.def=old;T.discard.push(c);
   log(`✨ ${old.name} evoluiu: agora é ${target.def.stage}!`,s);
+  if(s==="ai")(G.annq=G.annq||[]).push([target,`✨ ${old.name} evoluiu!`]);
 }
 function attach(s,c,target){const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);target.en.push(c);T.energyLeft--;log(`Energia de ${c.def.name} em ${target.def.name}.`,s);}
 /* troca de linha: 1 por turno. "with" pode ser outro jogador (troca) ou null (vai pra vaga vazia da outra linha) */
@@ -1385,6 +1406,7 @@ function canPlayEvent(s,c){
 }
 async function playEvent(s,c,target){
   const T=T_(s),O=T_(other(s)),k=c.def.key;
+  if(s==="ai")await announce(c,c.def.kind==="stadium"?`🏟️ ${nm(s)} muda o estádio!`:`🃏 ${nm(s)} joga um evento!`);
   T.hand.splice(T.hand.indexOf(c),1);
   if(c.def.kind==="stadium"){
     if(G.stadium)T_(G.stadium.owner).discard.push(G.stadium.card);
@@ -1447,7 +1469,7 @@ function aiGive(s){
   giveEnergy(s,best.t,best.p);T.energyLeft--;return true;
 }
 async function aiTurn(){
-  const s="ai",T=T_(s),wait=()=>sleep(650*SPEED());
+  const s="ai",T=T_(s),wait=async()=>{while(G.annq&&G.annq.length){const [c,t]=G.annq.shift();render();await announce(c,t);}await sleep(650*SPEED());};
   if(aiPlace(s)){render();await wait();}
   for(const c of [...T.hand]){if(c.def.kind==="player"&&c.def.from){const t=evoTargets(s,c);if(t.length){evolve(s,c,t[0]);render();await wait();}}}
   // troca de linha: tira da frente quem está quase caindo, ou sobe um carry de trás
@@ -1526,7 +1548,7 @@ function fieldCard(s,p){
     <div class="in"><div class="hd"><span class="nm">${d.name}</span><span class="fo">❤️${d.hp-p.dmg}</span></div>
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="art">${chibi(d)}</div>
-    <div class="ft"><span class="ro">${ROLEIC[d.role]}</span>${p.poison?"🧪":""}${p.para?"⚡":""}${p.free?`<span class="bf" title="Ataque grátis">⭐</span>`:""}${p.en.map(e=>eDot(e.def.type)).join("")}${p.buff?`<span class="bf">+${p.buff}</span>`:""}</div></div></button>`;
+    <div class="ft"><span class="ro">${ROLEIC[d.role]}</span>${p.poison?"😤":""}${p.para?"🔒":""}${p.free?`<span class="bf" title="Ataque grátis">⭐</span>`:""}${p.en.map(e=>eDot(e.def.type)).join("")}${p.buff?`<span class="bf">+${p.buff}</span>`:""}</div></div></button>`;
 }
 function lineHTML(s,l){
   const T=T_(s),cls=l==="F"?"front":"back";
@@ -1627,13 +1649,13 @@ function sheetHTML(){
     if(owner==="me"&&onField&&play){
       d.moves.forEach((m,i)=>{
         const ok=can&&!me.attacked&&canAct("me",c,m),b=bonusOf("me",c,m);
-        const what=m.kind==="dmg"?`${m.coin?`Moeda: CARA soma +${m.coin}. `:""}${m.tx||""}${b?`Bônus agora +${b}.`:""}`:m.tx;
+        const what=m.kind==="dmg"?`${m.coin?`Moeda: ${luckTx("me")} soma +${m.coin}. `:""}${m.tx||""}${b?`Bônus agora +${b}.`:""}`:m.tx;
         btns.push(AB(`move" data-i="${i}`,m.n,`${what} ${ok?"":(me.attacked?"Você já atacou.":whyNot("me",c,m))}`,ok?"pri":"",{left:`<span style="display:flex;gap:2px">${effCost(m).map(eDot).join("")}</span>`,val:m.kind==="buff"?"+"+m.buff:m.kind==="heal"?"♥"+m.heal:m.p},!ok));
       });
       if(mechOf("me")==="vstar"&&!me.vstarUsed&&inFront("me",c))d.moves.forEach((m,i)=>{const ok=can&&!me.attacked&&canAct("me",c,m);
         btns.push(AB(`move" data-i="${i}" data-dbl="1`,`🌟 ${m.n} em dobro`,`${CLUBS[me.club].coach.power}: só 1 vez no jogo.`,"",{left:"",val:m.p*2},!ok));});
-      if(c.poison)body+=`<p>🧪 <b>Envenenado:</b> perde 10 de vida no começo de cada turno seu enquanto estiver na frente. Mandar pra trás cura.</p>`;
-      if(c.para)body+=`<p>⚡ <b>Paralisado:</b> não ataca neste turno.</p>`;
+      if(c.poison)body+=`<p>😤 <b>Pressionado:</b> perde 10 de vida no começo de cada turno seu enquanto estiver na frente. Mandar pra trás tira a pressão.</p>`;
+      if(c.para)body+=`<p>🔒 <b>Marcado:</b> não ataca neste turno.</p>`;
       if(can&&me.energyLeft>0)["T","V"].forEach(t=>btns.push(AB(`give" data-t="${t}`,`Dar energia de ${EN[t]}`,"Você ganha 1 energia por turno pra dar a quem quiser.","",{left:eDot(t)})));
       if(c.free)body+=`<p>⭐ <b>Ataque grátis:</b> o próximo ataque dele não gasta energia (bônus de Ídolo e de quem evoluiu).</p>`;
       if(can&&!me.switched){
@@ -1677,6 +1699,7 @@ document.addEventListener("click",async e=>{
   if(a==="lore"){showLore(el.dataset.club);return;}
   if(a==="newgame"){PICK=null;showPick();return;}
   if(a==="close"){closeOv();return;}
+  if(a==="kick"){closeOv();if(G&&G.phase==="play"&&G.half===0&&!G.started){G.started=true;startTurn("me",true);}return;}
   if(a==="back"){showPick(!!PICK);return;}
   if(a==="rules"){showRules();return;}
   if(a==="yes"||a==="no"){if(ASK){const r=ASK;ASK=null;closeOv();r(a==="yes");}return;}
@@ -1723,7 +1746,7 @@ function rulesHTML(){return `
     <li><b>Frente vazia no fim do turno:</b> alguém de trás é obrigado a subir.</li>
     <li><b>Energia:</b> não vem na mão. Todo turno você ganha 1 pra dar, e os suportes de trás geram mais. Fica grudada no jogador, e <b>cada ataque gasta 1</b>. ${eDot("T")} Técnica, ${eDot("V")} Velocidade, ${eDot("C")} qualquer uma.</li>
     <li><b>⭐ Ataque grátis:</b> Ídolos e quem acabou de evoluir têm 1 ataque que não gasta energia.</li>
-    <li><b>Moeda 🪙:</b> CARA soma o bônus. <b>Evolução ↑:</b> vai em cima da versão anterior do mesmo jogador.</li>
+    <li><b>Moeda 🪙:</b> cada time torce por um lado: o Palmeiras pela COROA, os outros pela CARA. Deu o seu lado, soma o bônus. <b>Evolução ↑:</b> vai em cima da versão anterior do mesmo jogador.</li>
     <li><b>Respostas</b> (Cai-cai, VAR) são usadas na vez do rival. Eu te pergunto na hora.</li>
   </ol>
   <p>Cada clube tem a sua mecânica. Na escolha de time, toque no ℹ️ pra ler.</p>
@@ -1735,7 +1758,7 @@ function showPick(rival){
   G=null;ASK=null;if(!rival)PICK=null;
   ensureShell();document.getElementById("screen").innerHTML="";
   const list=ORDER().filter(k=>k!==PICK);
-  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"Brasileirão TCG"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha seu time. Toque no ℹ️ pra ler a história e a mecânica do clube."}</p>
+  showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"Brasileirão Cards"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha seu time. Toque no ℹ️ pra ler a história e a mecânica do clube."}</p>
   ${rival?`<div class="row" style="margin:8px 0"><button class="btn p" data-act="rival" data-club="rnd">🎲 Sortear rival</button><button class="btn s" data-act="newgame">Voltar</button></div>`:""}
   <div class="clubs">${list.map(k=>`<div class="cl" style="--c1:${CLUBS[k].c1};--c2:${CLUBS[k].c2}"><button class="go" data-act="${rival?"rival":"pick"}" data-club="${k}"><i></i><b>${CLUBS[k].name}</b><small>${CLUBS[k].coach.power}</small></button><button class="inf" data-act="lore" data-club="${k}" aria-label="História do ${CLUBS[k].name}">ℹ️</button></div>`).join("")}</div>
   ${rival?"":`<div class="row"><button class="btn s" data-act="rules">Como jogar</button></div>`}</div>`);
