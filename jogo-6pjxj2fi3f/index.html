@@ -206,6 +206,45 @@ html,body{overscroll-behavior:none}
 .chip.on{background:var(--gold);color:#231A00}
 .warn{color:var(--pink)!important;font-size:12px}.okk{color:var(--mine)!important;font-weight:700}
 .btn:disabled{opacity:.45}
+.inp{width:100%;font:inherit;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#0A1611;color:var(--fg)}
+.plist{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.pl{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.pl b{font-family:var(--f-display);font-size:17px;text-transform:uppercase;display:block}.pl small{color:var(--muted);font-size:12px}
+.sidelog{display:none}
+/* tela de PC: tela larga e deitada vira um tabuleiro maior, com a narração do lado */
+@media (min-width:1000px) and (min-height:600px) and (orientation:landscape){
+  .tag{display:none}
+  .phone{width:min(1320px,100%);height:calc(100dvh - 32px);min-height:0;border-width:6px;border-radius:22px;display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-rows:auto minmax(0,1fr) auto auto}
+  .top{grid-column:1/-1}
+  .field{grid-column:1;grid-row:2;padding:12px 24px;gap:10px;background:repeating-linear-gradient(90deg,var(--pitch) 0 80px,var(--pitch2) 80px 160px)}
+  .handBar{grid-column:1;grid-row:3}
+  .actions{grid-column:1;grid-row:4;justify-content:center}
+  .actions button{flex:0 1 320px}
+  .actions .sec{display:none}
+  .sidelog{display:flex;flex-direction:column;gap:8px;grid-column:2;grid-row:2/5;background:var(--panel);border-left:1px solid var(--line);padding:12px 14px;overflow:hidden;min-height:0}
+  .sidelog h4{margin:0;font-family:var(--f-display);text-transform:uppercase;font-size:18px}
+  .sidelog .log{overflow-y:auto;min-height:0;flex:1}
+  .sidelog .pw2{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}.sidelog .pw2 b{color:var(--gold)}
+  .turnPill{left:calc((100% - 330px)/2);top:60px}
+  .lineLbl{font-size:12px}
+  .side{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:36px;row-gap:4px}
+  .side .lineLbl{grid-column:1/-1}
+  .side .ln{grid-row:2}.side .ln.front{grid-column:1}.side .ln.back{grid-column:2;padding:8px;border-radius:14px;background:rgba(0,0,0,.14)}
+  .side .ln.back+.lineLbl{display:none}
+  .side .ln.front+.lineLbl{grid-row:3}
+  .ln{gap:14px}
+  .fc{width:150px;height:176px}.fc .art{height:96px}.fc .nm{font-size:13px}.fc .fo{font-size:14px}
+  .slot{width:150px;height:176px;font-size:13px}
+  .ln.back .fc,.ln.back .slot{width:118px;height:128px}.ln.back .fc .art{height:62px}
+  .ticker{font-size:14px;max-width:760px;margin:0 auto;width:100%}
+  .hand{justify-content:center;overflow-x:auto}
+  .hc{width:92px;height:122px}.hc .mini{height:60px}.hc .nm{font-size:11px;max-height:26px}.hc .ic{font-size:34px}
+  .sheetWrap{align-items:center;justify-content:center}
+  .sheet{width:min(520px,92%);border-radius:20px;border:1px solid var(--line);max-height:86%}
+  .ov .dlg{max-width:620px}
+  .cg{grid-template-columns:repeat(auto-fill,92px)}
+  .clubs{grid-template-columns:1fr 1fr}
+}
 </style>
 
 </head><body>
@@ -1219,7 +1258,7 @@ function beginMatch(){
 /* ================== REGRAS ================== */
 const minute=()=>Math.min(90,Math.round((G.half+1)*4.5));
 const T_=s=>G.t[s];
-const nm=s=>CLUBS[T_(s).club].name;
+const nm=s=>G&&G.names?G.names[s]:CLUBS[T_(s).club].name;
 const coachOn=s=>!T_(s).coachFired;
 const front=s=>T_(s).F.filter(Boolean);
 const back=s=>T_(s).B.filter(Boolean);
@@ -1298,7 +1337,7 @@ async function startTurn(side,first){
   T.energyLeft=1;T.escanteio=false;T.rerollUsed=false;T.attacked=false;T.switched=false;T.swLeft=mechOf(side)==="recuo"?2:1;
   if(G.half===10)log("⏱️ Intervalo! Começa o segundo tempo.","big");
   render();
-  if(side==="ai"){await sleep(700*SPEED());await aiTurn();}
+  if(side==="ai"&&!G.online){await sleep(700*SPEED());await aiTurn();}
 }
 function fillFront(s){
   const T=T_(s);
@@ -1321,6 +1360,7 @@ const luckTx=s=>luckOf(s).toUpperCase();
 async function flip(side,label){
   const r=Math.random()<.5,face=r?luckOf(side):(luckOf(side)==="Cara"?"Coroa":"Cara");
   const el=document.createElement("div");el.className="coin spin";el.textContent="…";phoneEl().appendChild(el);
+  netFx({fx:"coin",face});
   await sleep(600*SPEED());el.textContent=face;el.classList.remove("spin");
   await sleep(650*SPEED());el.remove();
   log(`🪙 ${label}: ${face.toUpperCase()}${r?" ✅":" ❌"}`,side);
@@ -1333,7 +1373,7 @@ async function announce(c,txt){
   el.innerHTML=`<div class="annIn"><span class="annT">${txt}</span>${bigCard(c)}</div>`;
   phoneEl().appendChild(el);await sleep((G.fast?900:2000));el.remove();
 }
-async function toast(txt,ms=1200){const el=document.createElement("div");el.className="toast";el.textContent=txt;phoneEl().appendChild(el);await sleep(ms*SPEED());el.remove();}
+async function toast(txt,ms=1200){netFx({fx:"toast",txt,ms});const el=document.createElement("div");el.className="toast";el.textContent=txt;phoneEl().appendChild(el);await sleep(ms*SPEED());el.remove();}
 
 async function act(side,p,move,target,dbl){
   if(G.over)return;
@@ -1391,8 +1431,8 @@ function knockOut(side,p){
 }
 async function useReaction(side,key,question){
   const T=T_(side),c=T.hand.find(x=>x.def.key===key);if(!c)return false;
-  const yes=side==="ai"?Math.random()<.8:await ask(EV[key].name,question,c);
-  if(yes&&side==="ai")await announce(c,`🪤 ${nm(side)} usa uma carta de resposta!`);
+  const yes=side==="ai"?(G.online?await netAsk(key,question):Math.random()<.8):await ask(EV[key].name,question,c);
+  if(yes&&side==="ai"&&!G.online)await announce(c,`🪤 ${nm(side)} usa uma carta de resposta!`);
   if(yes){T.hand.splice(T.hand.indexOf(c),1);T.discard.push(c);log(`${nm(side)} usa ${c.def.name}!`,side);render();}
   return yes;
 }
@@ -1402,7 +1442,7 @@ function place(s,c,line){
   const T=T_(s),i=T[line].indexOf(null);if(i<0)return false;
   T.hand.splice(T.hand.indexOf(c),1);c.turnIn=G.half;c.free=isStar(c.def);T[line][i]=c;
   log(`${c.def.name} entra ${line==="F"?"na frente":"atrás"}.`,s);
-  if(s==="ai"&&G.phase==="play")(G.annq=G.annq||[]).push([c,`➕ ${c.def.name} entra ${line==="F"?"na frente":"atrás"} do ${nm(s)}`]);
+  if(s==="ai"&&G.phase==="play"&&!G.online)(G.annq=G.annq||[]).push([c,`➕ ${c.def.name} entra ${line==="F"?"na frente":"atrás"} do ${nm(s)}`]);
   return true;
 }
 const evoTargets=(s,c)=>fieldOf(s).filter(p=>p.def.key===c.def.from&&p.turnIn!==G.half);
@@ -1410,7 +1450,7 @@ function evolve(s,c,target){
   const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);
   const old=target.def;target.def=c.def;target.turnIn=G.half;target.free=true;c.def=old;T.discard.push(c);
   log(`✨ ${old.name} evoluiu: agora é ${target.def.stage}!`,s);
-  if(s==="ai")(G.annq=G.annq||[]).push([target,`✨ ${old.name} evoluiu!`]);
+  if(s==="ai"&&!G.online)(G.annq=G.annq||[]).push([target,`✨ ${old.name} evoluiu!`]);
 }
 function attach(s,c,target){const T=T_(s);T.hand.splice(T.hand.indexOf(c),1);target.en.push(c);T.energyLeft--;log(`Energia de ${c.def.name} em ${target.def.name}.`,s);}
 /* troca de linha: 1 por turno. "with" pode ser outro jogador (troca) ou null (vai pra vaga vazia da outra linha) */
@@ -1432,6 +1472,7 @@ function canPlayEvent(s,c){
 async function playEvent(s,c,target){
   const T=T_(s),O=T_(other(s)),k=c.def.key;
   if(s==="ai")await announce(c,c.def.kind==="stadium"?`🏟️ ${nm(s)} muda o estádio!`:`🃏 ${nm(s)} joga um evento!`);
+  else netFx({fx:"ann",d:defId(c.def),txt:c.def.kind==="stadium"?`🏟️ ${nm(s)} muda o estádio!`:`🃏 ${nm(s)} joga um evento!`});
   T.hand.splice(T.hand.indexOf(c),1);
   if(c.def.kind==="stadium"){
     if(G.stadium)T_(G.stadium.owner).discard.push(G.stadium.card);
@@ -1541,6 +1582,7 @@ async function finishMatch(){
   }
   const me=T_("me").score+(pens?pens.me/100:0),ai=T_("ai").score+(pens?pens.ai/100:0);
   clearMatch();
+  if(G.online){G.pens=pens;netSyncNow();setTimeout(()=>netLeave(true),1500);}
   const res=me>ai?"win":me<ai?"loss":"draw",ess=matchReward(T_("me").score,res);
   showOv(`<div class="dlg"><h2>${me>ai?"Vitória!":"Derrota"}</h2>
     <p style="font-size:18px;color:var(--fg)">${score()}</p>
@@ -1609,7 +1651,7 @@ function render(){
   const last=G.log[0]?G.log[0].t:"";
   const pill=G.phase==="setup"?`<span class="turnPill setup">Escalação</span>`:G.over?"":`<span class="turnPill ${G.active}">${G.active==="me"?"Sua vez":"Vez do rival"}</span>`;
   const endBtn=G.phase==="setup"
-    ?`<button class="end" data-act="begin" ${front("me").length?"":"disabled"}>Começar partida</button>`
+    ?`<button class="end" data-act="begin" ${front("me").length&&!(G.ready&&G.ready.me)?"":"disabled"}>${G.ready&&G.ready.me?"Esperando o rival…":"Começar partida"}</button>`
     :`<button class="end" data-act="end" ${myTurn()?"":"disabled"}>Encerrar turno</button>`;
   ensureShell();
   document.getElementById("screen").innerHTML=`
@@ -1636,8 +1678,10 @@ function render(){
     <div class="handBar"><div class="hl"><span>${hint()}</span></div><div class="hand">${me.hand.map(handCard).join("")}</div>
       <div class="hl"><span>Baralho ${me.deck.length}</span><span>Energia pra dar: <b>${me.energyLeft}</b> · Troca de linha: <b>${me.switched?0:me.swLeft}</b></span></div></div>
     <div class="actions"><button class="sec" data-act="log">Narração</button>${endBtn}</div>
+    <aside class="sidelog"><h4>Narração</h4><ul class="log">${G.log.slice(0,80).map(l=>`<li class="${l.cls}">${l.t}</li>`).join("")}</ul>
+      <div class="pw2">${["me","ai"].map(s=>{const c=CLUBS[T_(s).club].coach;return `<p><b>${c.name}</b> (${nm(s)})${T_(s).coachFired?": demitido.":`: ${c.power}. ${c.text}`}</p>`;}).join("")}</div></aside>
     ${G.sheet?sheetHTML():""}`;
-  saveMatch();
+  saveMatch();netSync();
 }
 function ensureShell(){
   if(document.getElementById("screen"))return;
@@ -1726,7 +1770,7 @@ document.addEventListener("click",async e=>{
   if(a==="pick"){PICK=el.dataset.club;showPick(true);return;}
   if(a==="rival"){const pool=ORDER().filter(x=>x!==PICK),k=el.dataset.club==="rnd"?pool[rnd(pool.length)]:el.dataset.club;startGame(PICK,k);return;}
   if(a==="lore"){showLore(el.dataset.club);return;}
-  if(a==="newgame"){clearMatch();PICK=null;showPick();return;}
+  if(a==="newgame"){if(NET)netLeave(!!(G&&G.over));clearMatch();PICK=null;showPick();return;}
   if(a==="close"){closeOv();return;}
   if(a==="kick"){closeOv();if(G&&G.phase==="play"&&G.half===0&&!G.started){G.started=true;startTurn("me",true);}return;}
   if(a==="back"){showPick(!!PICK);return;}
@@ -1740,20 +1784,9 @@ document.addEventListener("click",async e=>{
   if(a==="info"){G.sheet={kind:"info"};render();return;}
   if(a==="fast"){G.fast=!G.fast;G.sheet=null;render();return;}
   if(a==="card"){G.sheet={kind:"card",uid:+el.dataset.uid};render();return;}
-  if(a==="begin"){if(front("me").length){G.sheet=null;beginMatch();}return;}
-  const me=T_("me");
-  if(a==="put"){const c=findCard(sh.uid);if((G.phase==="setup"||myTurn())&&place("me",c,el.dataset.l)){G.sheet=null;render();}return;}
-  if(!myTurn())return;
-  if(a==="end"){G.busy=true;G.sheet=null;log("Você passa a vez.","me");await endTurn();return;}
-  const c=sh&&sh.uid?findCard(sh.uid):null,w=el.dataset.w?findCard(el.dataset.w):null;
-  if(a==="move"){const m=c.def.moves[+el.dataset.i],dbl=!!el.dataset.dbl;if(!canAct("me",c,m)||me.attacked)return;const ts=targets("me",c,m);
-    if(ts.length===1){await act("me",c,m,ts[0],dbl);return;}G.sheet={kind:"targets",att:c.uid,mi:+el.dataset.i,dbl};render();return;}
-  if(a==="tgt"){const p=findCard(sh.att),m=p.def.moves[sh.mi],t=targets("me",p,m)[+el.dataset.i];if(t)await act("me",p,m,t,sh.dbl);return;}
-  if(a==="sw"){if(!me.switched){switchLine("me",c,w);G.sheet=null;render();}return;}
-  if(a==="evo"){evolve("me",c,w);G.sheet=null;render();return;}
-  if(a==="give"){if(me.energyLeft>0&&c&&slotOf("me",c)){giveEnergy("me",el.dataset.t,c);me.energyLeft--;G.sheet=null;render();}return;}
-  if(a==="en"){if(me.energyLeft>0){attach("me",c,w);G.sheet=null;render();}return;}
-  if(a==="ev"){G.sheet=null;await playEvent("me",c,w);render();return;}
+  if(a==="begin"){if(front("me").length){G.sheet=null;if(G.online)return netLocalAct("begin",null,{});beginMatch();}return;}
+  if(G.online)return netLocalAct(a,sh,{...el.dataset});
+  await runAct("me",a,sh,{...el.dataset});
 });
 
 /* ================== JANELAS ================== */
@@ -1761,7 +1794,7 @@ let ASK=null;
 function ovl(){return document.getElementById("ovl");}
 function showOv(html){const o=ovl();if(o)o.innerHTML=`<div class="ov">${html}</div>`;}
 function closeOv(){const o=ovl();if(o)o.innerHTML="";if(!G)showPick();}
-function ask(title,q,card){return new Promise(r=>{ASK=r;showOv(`<div class="dlg"><h2>${title}</h2><p>${q}</p><div style="display:flex;justify-content:center;margin:10px 0">${bigCard(card)}</div><div class="row"><button class="btn p" data-act="yes">Usar agora</button><button class="btn s" data-act="no">Guardar</button></div></div>`);});}
+function ask(title,q,card){return new Promise(r=>{ASK=r;showOv(`<div class="dlg keep"><h2>${title}</h2><p>${q}</p><div style="display:flex;justify-content:center;margin:10px 0">${bigCard(card)}</div><div class="row"><button class="btn p" data-act="yes">Usar agora</button><button class="btn s" data-act="no">Guardar</button></div></div>`);});}
 function rulesHTML(){return `
   <h2>Como jogar</h2>
   <ol>
@@ -1788,7 +1821,7 @@ function showPick(rival){
   ensureShell();document.getElementById("screen").innerHTML="";
   const list=ORDER().filter(k=>k!==PICK);
   showOv(`<div class="dlg"><h2>${rival?"Escolha o rival":"Brasileirão Cards"}</h2><p>${rival?`Você joga com o <b style="color:var(--fg)">${CLUBS[PICK].name}</b>. Contra quem? O computador joga com ele.`:"Escolha seu time. Toque no ℹ️ pra ler a história e a mecânica do clube."}</p>
-  ${rival?"":`${essHTML()}<div class="row" style="margin:0 0 10px"><button class="btn p" data-act="c-home">🎴 Pacotes e coleção</button><button class="btn s" data-act="c-play" ${teamOk()?"":"disabled"}>⭐ ${COL.name}</button></div><p style="font-size:12px">Ou jogue com um time pronto:</p>`}
+  ${rival?"":`${essHTML()}<div class="row" style="margin:0 0 10px"><button class="btn p" data-act="c-home">🎴 Pacotes e coleção</button><button class="btn s" data-act="c-play" ${teamOk()?"":"disabled"}>⭐ ${COL.name}</button><button class="btn p" data-act="o-home">🌐 Jogar online</button></div><p style="font-size:12px">Ou jogue com um time pronto:</p>`}
   ${rival?`<div class="row" style="margin:8px 0"><button class="btn p" data-act="rival" data-club="rnd">🎲 Sortear rival</button><button class="btn s" data-act="newgame">Voltar</button></div>`:""}
   <div class="clubs">${list.map(k=>`<div class="cl" style="--c1:${CLUBS[k].c1};--c2:${CLUBS[k].c2}"><button class="go" data-act="${rival?"rival":"pick"}" data-club="${k}"><i></i><b>${CLUBS[k].name}</b><small>${CLUBS[k].coach.power}</small></button><button class="inf" data-act="lore" data-club="${k}" aria-label="História do ${CLUBS[k].name}">ℹ️</button></div>`).join("")}</div>
   ${rival?"":`<div class="row"><button class="btn s" data-act="rules">Como jogar</button></div>`}</div>`);
@@ -1810,7 +1843,7 @@ const SAVE_KEY="brasileirao-partida-v1";
 const defId=d=>d.kind==="player"?"P:"+d.key:d.kind==="energy"?"E:"+d.type:"V:"+d.key;
 const defFrom=id=>{const [k,v]=[id.slice(0,1),id.slice(2)];return k==="P"?DEFS[v]:k==="E"?{kind:"energy",type:v,name:EN[v]}:EV[v];};
 function saveMatch(){
-  if(!G||G.over||G.busy)return;
+  if(!G||G.over||G.busy||G.online)return;
   if(!(G.phase==="setup"||G.active==="me"))return;
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({g:G,meu:CLUBS.meu||null,uid:UID},(k,v)=>k==="def"&&v&&v.kind?defId(v):k==="sheet"?null:v));}catch(e){}
 }
@@ -1987,6 +2020,255 @@ document.addEventListener("click",e=>{
   if(a==="c-play"){if(!teamOk())return showTeam();buildMine();PICK="meu";return showPick(true);}
 });
 
+
+/* ================== JOGAR ONLINE ==================
+   Saguão: quem está online aparece numa lista; você desafia e o amigo aceita.
+   Quem desafia é o "dono" da partida: o jogo roda no celular dele, e o do amigo só mostra e manda as jogadas.
+   A ponte entre os celulares é o Firebase (Realtime Database), um serviço grátis do Google. */
+const FB_CONFIG=/*FIREBASE*/{apiKey:"AIzaSyDEQjg8-2MqQ_Fy2bMRux5UhSoy7MWDPLk",authDomain:"brasileirao-card-game.firebaseapp.com",databaseURL:"https://brasileirao-card-game-default-rtdb.firebaseio.com",projectId:"brasileirao-card-game",storageBucket:"brasileirao-card-game.firebasestorage.app",messagingSenderId:"732930412314",appId:"1:732930412314:web:b02c47c066358fb8de66a3"}/*FIM-FIREBASE*/;
+const FB_V="10.12.2";
+const NAME_KEY="brasileirao-nome";
+let NAME="";try{NAME=localStorage.getItem(NAME_KEY)||"";}catch(e){}
+const loadJS=src=>new Promise((ok,no)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>no(new Error("load"));document.head.appendChild(s);});
+const BK={ready:false,uid:null,
+  async init(){
+    if(this.ready)return;
+    if(window.__MOCKBK){Object.assign(this,window.__MOCKBK);await this.start();this.ready=true;return;}
+    if(!FB_CONFIG)throw new Error("semconfig");
+    for(const m of ["app","auth","database"])await loadJS(`https://www.gstatic.com/firebasejs/${FB_V}/firebase-${m}-compat.js`);
+    if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+    try{await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);}catch(e){try{await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);}catch(e2){}}
+    const cr=await firebase.auth().signInAnonymously();this.uid=cr.user.uid;this.db=firebase.database();this.ready=true;
+  },
+  ref(p){return this.db.ref(p);},
+  set(p,v){return this.ref(p).set(v);},
+  push(p,v){return this.ref(p).push(v);},
+  remove(p){return this.ref(p).remove();},
+  onLeave(p,v){const d=this.ref(p).onDisconnect();return v===undefined?d.remove():d.set(v);},
+  cancelLeave(p){return this.ref(p).onDisconnect().cancel();},
+  onValue(p,cb){const r=this.ref(p),f=s=>cb(s.val());r.on("value",f);return()=>r.off("value",f);},
+  onAdded(p,cb){const r=this.ref(p),f=s=>cb(s.val(),s.key);r.on("child_added",f);return()=>r.off("child_added",f);}
+};
+let NET=null,ON_TEAM=null,LOBBY={},OFF=[];
+const offAll=()=>{OFF.forEach(f=>{try{f();}catch(e){}});OFF=[];};
+const teamLabel=k=>k==="meu"?`⭐ ${COL.name}`:CLUBS[k].name;
+
+/* ---- tela: nome e time ---- */
+function showOnline(msg){
+  G=null;ASK=null;ensureShell();document.getElementById("screen").innerHTML="";
+  if(!ON_TEAM||(ON_TEAM==="meu"&&!teamOk()))ON_TEAM=teamOk()?"meu":"cor";
+  showOv(`<div class="dlg"><h2>Jogar online</h2>
+  ${msg?`<p class="warn">${msg}</p>`:""}
+  <p>Seu nome de jogador (é o que seus amigos vão ver):</p>
+  <input id="nmIn" class="inp" maxlength="16" placeholder="Ex.: Leo do Verdão" value="${NAME.replace(/"/g,"&quot;")}">
+  <h3 class="sub">Com qual time?</h3>
+  <div class="chips">${teamOk()?`<button type="button" class="chip ${ON_TEAM==="meu"?"on":""}" data-act="o-team" data-club="meu">⭐ ${COL.name}</button>`:""}${ORDER().map(k=>`<button type="button" class="chip ${ON_TEAM===k?"on":""}" data-act="o-team" data-club="${k}" style="--c1:${CLUBS[k].c1}">${CLUBS[k].code}</button>`).join("")}</div>
+  <p style="font-size:12px">Time escolhido: <b style="color:var(--fg)">${teamLabel(ON_TEAM)}</b></p>
+  <div class="row"><button class="btn p" data-act="o-enter">Entrar no saguão</button><button class="btn s" data-act="newgame">Voltar</button></div></div>`);
+}
+const readName=()=>{const el=document.getElementById("nmIn");if(el){NAME=el.value.trim().slice(0,16);try{localStorage.setItem(NAME_KEY,NAME);}catch(e){}}return NAME;};
+
+/* ---- saguão ---- */
+async function enterLobby(){
+  if(!readName())return showOnline("Coloque seu nome primeiro.");
+  showOv(`<div class="dlg"><h2>Conectando…</h2><p>Entrando no saguão.</p></div>`);
+  try{await BK.init();}catch(e){console.error(e);return showOnline(e.message==="semconfig"?"O online ainda não foi ligado: falta configurar o Firebase.":`Não consegui conectar. Confira a internet e tente de novo. (${esc(e.code||e.message||"erro")})`);}
+  offAll();LOBBY={};
+  const me=`lobby/${BK.uid}`;
+  await BK.set(me,{name:NAME,team:teamLabel(ON_TEAM),ts:Date.now()});BK.onLeave(me);
+  OFF.push(()=>BK.remove(me));
+  OFF.push(BK.onValue("lobby",v=>{LOBBY=v||{};if(!G&&NET===null&&document.getElementById("lobby"))drawLobby();}));
+  OFF.push(BK.onAdded(`invites/${BK.uid}`,(v,k)=>{if(v&&!G)gotInvite(v,k);}));
+  drawLobby();
+}
+function drawLobby(){
+  const list=Object.entries(LOBBY).filter(([k])=>k!==BK.uid).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
+  showOv(`<div class="dlg" id="lobby"><h2>Saguão</h2>
+  <p>Você: <b style="color:var(--fg)">${NAME}</b> · ${teamLabel(ON_TEAM)}</p>
+  <h3 class="sub">Online agora (${list.length})</h3>
+  <div class="plist">${list.length?list.map(([k,p])=>`<div class="pl"><div><b>${esc(p.name)}</b><small>${esc(p.team||"")}</small></div><button class="btn p" data-act="o-dare" data-uid="${k}">Desafiar</button></div>`).join(""):`<p>Ninguém online ainda. Chame seus amigos pra abrir o jogo e entrar no saguão!</p>`}</div>
+  <div class="row"><button class="btn s" data-act="o-leave">Sair do saguão</button></div></div>`);
+}
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+function myTeamInfo(){
+  if(ON_TEAM==="meu"){buildMine();return {club:"meu",clubDef:CLUBS.meu,deck:DECKS.meu};}
+  return {club:ON_TEAM};
+}
+async function dare(uid){
+  const room=BK.uid.slice(0,6)+Date.now().toString(36);
+  await BK.set(`invites/${uid}/${BK.uid}`,{name:NAME,team:teamLabel(ON_TEAM),room,ts:Date.now()});
+  const who=(LOBBY[uid]||{}).name||"seu amigo";
+  showOv(`<div class="dlg"><h2>Desafio enviado</h2><p>Esperando <b style="color:var(--fg)">${esc(who)}</b> aceitar…</p><div class="row"><button class="btn s" data-act="o-cancel" data-uid="${uid}">Cancelar</button></div></div>`);
+  NET={role:"wait",room,to:uid};
+  const stop=BK.onValue(`rooms/${room}`,v=>{
+    if(!v||!NET||NET.room!==room)return;
+    if(v.decline){stop();NET=null;BK.remove(`rooms/${room}`);showOv(`<div class="dlg"><h2>Não rolou</h2><p>${esc(who)} recusou o desafio.</p><div class="row"><button class="btn p" data-act="o-back">Voltar ao saguão</button></div></div>`);}
+    else if(v.guest){stop();hostStart(room,v.guest);}
+  });
+  OFF.push(stop);
+}
+function gotInvite(v,k){
+  showOv(`<div class="dlg"><h2>Desafio!</h2><p><b style="color:var(--fg)">${esc(v.name)}</b> (${esc(v.team)}) te chamou pra jogar.</p>
+  <div class="row"><button class="btn p" data-act="o-accept" data-k="${k}" data-room="${v.room}">Aceitar</button><button class="btn s" data-act="o-decline" data-k="${k}" data-room="${v.room}">Recusar</button></div></div>`);
+}
+
+/* ---- conversa durante a partida ---- */
+const ASKS={};
+function netSend(msg){if(!NET||!NET.room)return;BK.push(`rooms/${NET.room}/${NET.role==="host"?"toG":"toH"}`,{j:JSON.stringify(msg)});}
+let syncT=null;
+function netSyncNow(){
+  if(!G||!G.online||G.online.role!=="host"||!NET)return;
+  const clubs={};for(const k of ["meu","meu_g"])if(CLUBS[k])clubs[k]=CLUBS[k];
+  const str=JSON.stringify({g:G,clubs},(k,v)=>k==="def"&&v&&v.kind?defId(v):k==="sheet"||k==="annq"?null:k==="log"?v.slice(0,40):v);
+  BK.set(`rooms/${NET.room}/state`,str);
+}
+function netSync(){
+  if(!G||!G.online||G.online.role!=="host"||!NET||syncT)return;
+  syncT=setTimeout(()=>{syncT=null;netSyncNow();},60);
+}
+const netFx=fx=>{if(G&&G.online&&G.online.role==="host")netSend(Object.assign({k:"fx"},fx));};
+function hostStart(room,guest){
+  offAll();BK.remove(`lobby/${BK.uid}`);
+  NET={role:"host",room};
+  const mine=myTeamInfo();
+  let gc=guest.club;
+  if(gc==="meu"){CLUBS.meu_g=Object.assign({},guest.clubDef,{id:"meu_g"});DECKS.meu_g=guest.deck;gc="meu_g";}
+  if(!CLUBS[gc])gc="cor";
+  G={half:0,active:"me",phase:"setup",busy:false,sheet:null,log:[],stadium:null,fast:false,over:false,
+     online:{role:"host"},names:{me:NAME,ai:guest.name||"Rival"},ready:{me:false,ai:false},
+     t:{me:newTeam(mine.club),ai:newTeam(gc)}};
+  closeOv();
+  log(`${G.names.me} x ${G.names.ai}, online! Monte sua escalação e toque em "Começar partida".`,"big");
+  BK.onLeave(`rooms/${room}/left`,"host");
+  OFF.push(BK.onAdded(`rooms/${room}/toH`,v=>{try{hostGot(JSON.parse(v.j));}catch(e){}}));
+  OFF.push(BK.onValue(`rooms/${room}/left`,v=>{if(v==="guest")friendLeft();}));
+  render();
+}
+async function hostGot(m){
+  if(!G||!G.online)return;
+  if(m.a==="answer"){const r=ASKS[m.id];if(r){delete ASKS[m.id];r(!!m.y);}return;}
+  if(m.a==="begin"){netBegin("ai");return;}
+  await runAct("ai",m.a,m.sh,m.ds||{});
+}
+function netAsk(key,question){
+  return new Promise(r=>{const id=Math.random().toString(36).slice(2);ASKS[id]=r;netSend({k:"ask",id,key,question});
+    setTimeout(()=>{if(ASKS[id]){delete ASKS[id];r(false);}},25000);});
+}
+function netBegin(s){
+  if(G.phase!=="setup"||!front(s).length)return;
+  G.ready[s]=true;log(`${nm(s)} está pronto!`,s);
+  if(G.ready.me&&G.ready.ai){netFx({fx:"toast",txt:"Bola rolando!"});beginMatch();}
+  render();
+}
+async function guestJoin(room,k){
+  offAll();BK.remove(`lobby/${BK.uid}`);BK.remove(`invites/${BK.uid}/${k}`);
+  NET={role:"guest",room};ENDED=false;
+  const mine=myTeamInfo();
+  await BK.set(`rooms/${room}/guest`,Object.assign({name:NAME,uid:BK.uid},mine));
+  BK.onLeave(`rooms/${room}/left`,"guest");
+  showOv(`<div class="dlg"><h2>Entrando…</h2><p>Montando o campo.</p></div>`);
+  OFF.push(BK.onValue(`rooms/${room}/state`,v=>{if(v)installState(v);}));
+  OFF.push(BK.onAdded(`rooms/${room}/toG`,v=>{try{guestGot(JSON.parse(v.j));}catch(e){}}));
+  OFF.push(BK.onValue(`rooms/${room}/left`,v=>{if(v==="host")friendLeft();}));
+}
+let ENDED=false;
+const swS=x=>x==="me"?"ai":x==="ai"?"me":x;
+function installState(str){
+  const s=JSON.parse(str,(k,v)=>k==="def"&&typeof v==="string"?defFrom(v):v);
+  for(const [k,v] of Object.entries(s.clubs||{}))CLUBS[k]=v;
+  const g=s.g,keep=G&&G.online?G.sheet:null;
+  g.t={me:g.t.ai,ai:g.t.me};g.active=swS(g.active);
+  if(g.stadium)g.stadium.owner=swS(g.stadium.owner);
+  (g.log||[]).forEach(l=>l.cls=swS(l.cls));
+  g.names={me:g.names.ai,ai:g.names.me};g.ready={me:g.ready.ai,ai:g.ready.me};
+  g.online={role:"guest"};G=g;
+  G.sheet=keep&&(!keep.uid||findCard(keep.uid))?keep:null;
+  if(!document.querySelector(".ov .dlg.keep"))closeOvSilent();
+  render();
+  if(G.over&&G.pens!==undefined&&!ENDED){ENDED=true;guestEnd();}
+}
+function closeOvSilent(){const o=ovl();if(o)o.innerHTML="";}
+async function guestGot(m){
+  if(m.k==="fx"){
+    if(m.fx==="toast")toast(m.txt,m.ms||1200);
+    if(m.fx==="coin"){const el=document.createElement("div");el.className="coin";el.textContent=m.face;phoneEl().appendChild(el);await sleep(900);el.remove();}
+    if(m.fx==="ann")announce({def:defFrom(m.d),dmg:0,en:[]},m.txt);
+    return;
+  }
+  if(m.k==="ask"){
+    const c=G&&T_("me").hand.find(x=>x.def.key===m.key);
+    const y=c?await ask(EV[m.key].name,m.question,c):false;
+    netSend({a:"answer",id:m.id,y});
+  }
+}
+async function guestEnd(){
+  const me=T_("me").score,ai=T_("ai").score,p=G.pens;
+  const pm=p?p.ai:0,pa=p?p.me:0;
+  const res=me+pm/100>ai+pa/100?"win":me+pm/100<ai+pa/100?"loss":"draw",ess=matchReward(me,res);
+  showOv(`<div class="dlg keep"><h2>${res==="win"?"Vitória!":"Derrota"}</h2><p style="font-size:18px;color:var(--fg)">${score()}</p>
+  ${p?`<p>Nos pênaltis: ${pm} x ${pa}</p>`:""}
+  <div class="essbar"><span>💠 +<b>${ess}</b> essências</span><span>Total: ${COL.ess}</span></div>
+  <div class="row"><button class="btn p" data-act="o-again">Voltar ao saguão</button><button class="btn s" data-act="newgame">Menu</button></div></div>`);
+  netLeave(true);
+}
+function friendLeft(){
+  if(!G||G.over)return;
+  G.over=true;
+  showOv(`<div class="dlg keep"><h2>Partida encerrada</h2><p>Seu amigo saiu ou a internet dele caiu.</p><div class="row"><button class="btn p" data-act="o-again">Voltar ao saguão</button><button class="btn s" data-act="newgame">Menu</button></div></div>`);
+  netLeave(false);
+}
+function netLeave(finished){
+  if(!NET)return;
+  const room=NET.room,role=NET.role;
+  if(room&&(role==="host"||role==="guest")){
+    BK.cancelLeave(`rooms/${room}/left`);
+    if(!finished)BK.set(`rooms/${room}/left`,role);
+    if(role==="host")setTimeout(()=>BK.remove(`rooms/${room}`),finished?8000:0);
+  }
+  offAll();NET=null;
+}
+
+/* jogada de um dos lados (no celular do dono roda pros dois) */
+const turnOf=s=>G&&G.phase==="play"&&G.active===s&&!G.busy&&!G.over;
+async function runAct(s,a,sh,ds){
+  if(!G)return;
+  const me=T_(s),local=s==="me";
+  if(a==="put"){const c=sh&&findCard(sh.uid);if(c&&me.hand.includes(c)&&(G.phase==="setup"&&!(G.ready&&G.ready[s])||turnOf(s))&&place(s,c,ds.l)){if(local)G.sheet=null;render();}return;}
+  if(!turnOf(s))return;
+  if(a==="end"){G.busy=true;if(local)G.sheet=null;log(G.online?`${nm(s)} passa a vez.`:"Você passa a vez.",s);await endTurn();return;}
+  const c=sh&&sh.uid?findCard(sh.uid):null,w=ds.w?findCard(ds.w):null;
+  if(a==="move"){if(!c)return;const m=c.def.moves[+ds.i],dbl=!!ds.dbl;if(!m||!canAct(s,c,m)||me.attacked)return;const ts=targets(s,c,m);
+    if(ts.length===1){await act(s,c,m,ts[0],dbl);return;}if(local){G.sheet={kind:"targets",att:c.uid,mi:+ds.i,dbl};render();}return;}
+  if(a==="tgt"){const p=findCard(sh.att);if(!p)return;const m=p.def.moves[sh.mi],t=targets(s,p,m)[+ds.i];if(t&&canAct(s,p,m)&&!me.attacked)await act(s,p,m,t,sh.dbl);return;}
+  if(a==="sw"){if(c&&!me.switched){switchLine(s,c,w);if(local)G.sheet=null;render();}return;}
+  if(a==="evo"){if(c&&w){evolve(s,c,w);if(local)G.sheet=null;render();}return;}
+  if(a==="give"){if(me.energyLeft>0&&c&&slotOf(s,c)){giveEnergy(s,ds.t,c);me.energyLeft--;if(local)G.sheet=null;render();}return;}
+  if(a==="en"){if(c&&me.energyLeft>0){attach(s,c,w);if(local)G.sheet=null;render();}return;}
+  if(a==="ev"){if(!c||!me.hand.includes(c))return;if(local)G.sheet=null;await playEvent(s,c,w);render();return;}
+}
+/* toque na tela durante uma partida online */
+async function netLocalAct(a,sh,ds){
+  if(G.online.role==="host"){if(a==="begin")return netBegin("me");return runAct("me",a,sh,ds);}
+  if(a==="begin"){netSend({a:"begin"});return;}
+  if(a==="move"&&sh&&sh.uid){const c=findCard(sh.uid),m=c&&c.def.moves[+ds.i];if(m&&targets("me",c,m).length>1){G.sheet={kind:"targets",att:c.uid,mi:+ds.i,dbl:!!ds.dbl};render();return;}}
+  if(["put","end","move","tgt","sw","evo","give","en","ev"].includes(a)){G.sheet=null;render();netSend({a,sh,ds});}
+}
+
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act^='o-']");if(!el)return;
+  const a=el.dataset.act;
+  if(a==="o-home")return showOnline();
+  if(a==="o-team"){readName();ON_TEAM=el.dataset.club;return showOnline();}
+  if(a==="o-enter")return enterLobby();
+  if(a==="o-back"){NET=null;return drawLobby();}
+  if(a==="o-leave"){offAll();NET=null;return showPick();}
+  if(a==="o-dare")return dare(el.dataset.uid);
+  if(a==="o-cancel"){if(NET&&NET.to)BK.remove(`invites/${NET.to}/${BK.uid}`);NET=null;return drawLobby();}
+  if(a==="o-accept")return guestJoin(el.dataset.room,el.dataset.k);
+  if(a==="o-decline"){BK.set(`rooms/${el.dataset.room}/decline`,true);BK.remove(`invites/${BK.uid}/${el.dataset.k}`);return drawLobby();}
+  if(a==="o-again"){G=null;return enterLobby();}
+});
+
 /* ---- começo: volta pra partida salva, se tiver ---- */
 if(loadMatch()){
   ensureShell();render();
@@ -1995,5 +2277,5 @@ if(loadMatch()){
 }else showPick();
 </script>
 
-<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script>
+<script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body></html>
